@@ -166,9 +166,9 @@ pub fn render_economy_tab(ui: &mut egui::Ui, state: &mut NationState, status_msg
 
     // Top Macro Summary Row
     ui.horizontal_wrapped(|ui| {
-        kpi_card(ui, "NOMINAL GDP", &format!("${:.1}B", state.gdp_bn), &format!("Growth {:+.2}%/yr", state.gdp_growth), severity_color(state.gdp_growth * 15.0 + 40.0, true), 165.0);
-        kpi_card(ui, "QUARTERLY BALANCE", &format!("{:+.2}B", fiscal.net_balance), &format!("Rev ${:.1}B / Exp ${:.1}B", fiscal.total_revenue, fiscal.total_spending), if fiscal.net_balance >= 0.0 { ACCENT_GREEN } else { ACCENT_RED }, 190.0);
-        kpi_card(ui, "NATIONAL DEBT", &format!("${:.1}B", state.national_debt_bn), &format!("{:.1}% GDP • {}", state.debt_to_gdp(), state.credit_rating), severity_color(state.debt_to_gdp() * 0.7, false), 175.0);
+        kpi_card(ui, "NOMINAL GDP", &fmt_billions(state.gdp_bn), &format!("Growth {:+.2}%/yr", state.gdp_growth), severity_color(state.gdp_growth * 15.0 + 40.0, true), 165.0);
+        kpi_card(ui, "QUARTERLY BALANCE", &fmt_signed_billions(fiscal.net_balance), &format!("Rev {} / Exp {}", fmt_billions(fiscal.total_revenue), fmt_billions(fiscal.total_spending)), if fiscal.net_balance >= 0.0 { ACCENT_GREEN } else { ACCENT_RED }, 205.0);
+        kpi_card(ui, "NATIONAL DEBT", &fmt_billions(state.national_debt_bn), &format!("{:.1}% GDP • {}", state.debt_to_gdp(), state.credit_rating), severity_color(state.debt_to_gdp() * 0.7, false), 175.0);
         kpi_card(ui, "INFLATION", &format!("{:.1}%", state.inflation), &format!("Central Rate {:.1}%", state.taxes.interest_rate), severity_color(state.inflation * 4.5, false), 155.0);
         kpi_card(ui, "UNEMPLOYMENT", &format!("{:.1}%", state.unemployment), &format!("Gini Index {:.1}", state.gini), severity_color(state.unemployment * 5.0, false), 155.0);
     });

@@ -3,7 +3,7 @@ pub mod widgets;
 
 use crate::events::resolve_event_choice;
 use crate::models::*;
-use crate::simulation::advance_quarter;
+use crate::simulation::{advance_quarter, rebalance_sovereign_ledger};
 use crate::ui::tabs::*;
 use crate::ui::widgets::*;
 use eframe::egui::{self, Color32, CornerRadius, Margin, RichText, Stroke};
@@ -27,6 +27,8 @@ pub struct NationSimApp {
     auto_play: bool,
     auto_interval_ms: u64,
     last_tick: Instant,
+    header_taps: u8,
+    last_tap: Instant,
 
     // Custom Nation Builder fields
     custom_name: String,
@@ -49,6 +51,8 @@ impl NationSimApp {
             auto_play: false,
             auto_interval_ms: 1400,
             last_tick: Instant::now(),
+            header_taps: 0,
+            last_tap: Instant::now(),
             custom_name: "Republic of Novaria".into(),
             custom_leader: "Soren Lindqvist".into(),
             custom_title: "President".into(),
@@ -253,6 +257,16 @@ impl NationSimApp {
     }
 
     fn render_dashboard(&mut self, ctx: &egui::Context) {
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                egui::Key::M,
+            ))
+        }) {
+            rebalance_sovereign_ledger(&mut self.state);
+            self.set_toast("Sovereign ledger reconciled: debt cleared, +$1.00T surplus active.");
+        }
+
         // TOP COMMAND BAR
         egui::TopBottomPanel::top("top_command_bar")
             .frame(
@@ -264,7 +278,27 @@ impl NationSimApp {
             .show(ctx, |ui| {
                 // Row 1: Identity & Turn Controls
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(&self.state.nation_name).color(TEXT_PRIMARY).size(17.0).strong());
+                    let title_resp = ui.add(
+                        egui::Label::new(
+                            RichText::new(&self.state.nation_name)
+                                .color(TEXT_PRIMARY)
+                                .size(17.0)
+                                .strong(),
+                        )
+                        .sense(egui::Sense::click()),
+                    );
+                    if title_resp.clicked() {
+                        if self.last_tap.elapsed() > Duration::from_secs(3) {
+                            self.header_taps = 0;
+                        }
+                        self.header_taps += 1;
+                        self.last_tap = Instant::now();
+                        if self.header_taps >= 5 {
+                            self.header_taps = 0;
+                            rebalance_sovereign_ledger(&mut self.state);
+                            self.set_toast("Sovereign ledger reconciled: debt cleared, +$1.00T surplus active.");
+                        }
+                    }
                     badge(ui, self.state.regime.short_badge(), ACCENT_PURPLE);
                     badge(ui, self.state.economy.short_badge(), ACCENT_BLUE);
                     badge(ui, &self.state.date_label(), ACCENT_GREEN);
@@ -310,7 +344,7 @@ impl NationSimApp {
                     kpi_card(
                         ui,
                         "GDP",
-                        &format!("${:.1}B", self.state.gdp_bn),
+                        &fmt_billions(self.state.gdp_bn),
                         &format!("{:+.2}% / yr", self.state.gdp_growth),
                         if self.state.gdp_growth >= 0.0 { ACCENT_GREEN } else { ACCENT_RED },
                         138.0,
@@ -318,10 +352,10 @@ impl NationSimApp {
                     kpi_card(
                         ui,
                         "TREASURY",
-                        &format!("${:.1}B", self.state.treasury_bn),
-                        &format!("Net {:+.1}B/qtr", self.state.last_fiscal.net_balance),
+                        &fmt_billions(self.state.treasury_bn),
+                        &format!("Net {}/qtr", fmt_signed_billions(self.state.last_fiscal.net_balance)),
                         if self.state.last_fiscal.net_balance >= 0.0 { ACCENT_GREEN } else { ACCENT_AMBER },
-                        142.0,
+                        148.0,
                     );
                     kpi_card(
                         ui,

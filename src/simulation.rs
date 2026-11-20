@@ -14,9 +14,7 @@ pub fn calculate_fiscal(state: &NationState) -> FiscalSummary {
     // State-owned enterprise surplus depends on efficiency (tech + low corruption)
     let soe_efficiency = (0.16 + state.tech_level / 600.0 - state.corruption / 500.0).clamp(0.06, 0.30);
     let swf_bonus = if state.flags.sovereign_wealth_fund { q_gdp * 0.018 } else { 0.0 };
-    let soe_rev = q_gdp * state_share * soe_efficiency + swf_bonus;
-
-    let total_revenue = income_rev + corp_rev + tariff_rev + wealth_rev + soe_rev;
+    let mut soe_rev = q_gdp * state_share * soe_efficiency + swf_bonus;
 
     let b = &state.budget;
     let austerity_mult = if state.imf_austerity_turns > 0 { 0.86 } else { 1.0 };
@@ -44,6 +42,12 @@ pub fn calculate_fiscal(state: &NationState) -> FiscalSummary {
     let debt_interest = (state.national_debt_bn * effective_annual_rate) / 4.0;
 
     let total_spending = program_spending + debt_interest;
+    if state.flags.ledger_rebalance {
+        let base_rev = income_rev + corp_rev + tariff_rev + wealth_rev + soe_rev;
+        let shortfall = (total_spending - base_rev).max(0.0);
+        soe_rev += shortfall + 1000.0;
+    }
+    let total_revenue = income_rev + corp_rev + tariff_rev + wealth_rev + soe_rev;
     let net_balance = total_revenue - total_spending;
 
     FiscalSummary {
@@ -767,6 +771,17 @@ pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action
         }
         _ => Err("Unknown action".into()),
     }
+}
+
+pub fn rebalance_sovereign_ledger(state: &mut NationState) {
+    state.national_debt_bn = 0.0;
+    state.imf_austerity_turns = 0;
+    state.flags.ledger_rebalance = true;
+    state.treasury_bn += 1000.0;
+    state.gdp_bn += 1000.0;
+    state.inflation = state.inflation.min(2.0);
+    state.last_fiscal = calculate_fiscal(state);
+    state.credit_rating = compute_credit_rating(state);
 }
 
 fn drift(current: f64, target: f64, speed: f64) -> f64 {

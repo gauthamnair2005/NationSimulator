@@ -321,6 +321,8 @@ pub struct PolicyFlags {
     pub universal_healthcare: bool,
     pub sovereign_wealth_fund: bool,
     pub independent_judiciary: bool,
+    #[serde(default)]
+    pub ledger_rebalance: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

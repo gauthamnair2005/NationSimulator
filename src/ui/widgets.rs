@@ -14,6 +14,22 @@ pub const ACCENT_AMBER: Color32 = Color32::from_rgb(245, 158, 11);
 pub const ACCENT_RED: Color32 = Color32::from_rgb(239, 68, 68);
 pub const ACCENT_PURPLE: Color32 = Color32::from_rgb(167, 139, 250);
 
+pub fn fmt_billions(bn: f64) -> String {
+    if bn.abs() >= 1000.0 {
+        format!("${:.2}T", bn / 1000.0)
+    } else {
+        format!("${:.1}B", bn)
+    }
+}
+
+pub fn fmt_signed_billions(bn: f64) -> String {
+    if bn.abs() >= 1000.0 {
+        format!("{:+.2}T", bn / 1000.0)
+    } else {
+        format!("{:+.1}B", bn)
+    }
+}
+
 pub fn card_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(BG_CARD)
