@@ -248,6 +248,19 @@ pub enum ForeignPowerId {
     CrescentCoalition,
     BorderlandRepublic,
     GlobalMonetaryCouncil,
+    BharatUnion,
+    NordicConfederation,
+    PacificSyndicate,
+    AndeanFederation,
+    SaharaAlliance,
+    AlpineRepublic,
+    VesperaEmpire,
+    KharosDesertLeague,
+    CaledonArchipelago,
+    DrakoriaState,
+    LuminaRepublic,
+    OakhavenUnion,
+    Emergent(u32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,11 +284,168 @@ pub struct ForeignPower {
     pub annexed: bool,
     #[serde(default)]
     pub puppet_state: bool,
+    #[serde(default)]
+    pub is_rebel_state: bool,
+    #[serde(default)]
+    pub parent_origin: Option<String>,
+    #[serde(default)]
+    pub flag_seed: u8,
 }
 
 impl ForeignPower {
     pub fn is_conquerable(&self) -> bool {
         self.id != ForeignPowerId::GlobalMonetaryCouncil && !self.annexed
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DefensePrograms {
+    pub fighter_jet_name: String,
+    pub fighter_jet_tier: u8,      // 0..=4
+    pub fighter_jet_progress: f64, // 0..100
+    pub fighter_tests: u32,
+    pub missile_tier: u8,          // 0..=3
+    pub missile_progress: f64,     // 0..100
+    pub missile_tests: u32,
+    pub space_tier: u8,            // 0..=3
+    pub space_progress: f64,       // 0..100
+    pub space_launches: u32,
+    pub nuclear_warheads: u32,
+    pub nuke_tests_conducted: u32,
+    pub carrier_groups: u32,
+    pub speeches_delivered: u32,
+    pub diplomatic_visits: u32,
+    pub military_drills: u32,
+}
+
+impl Default for DefensePrograms {
+    fn default() -> Self {
+        Self {
+            fighter_jet_name: "Aegis-X Viper".into(),
+            fighter_jet_tier: 0,
+            fighter_jet_progress: 0.0,
+            fighter_tests: 0,
+            missile_tier: 0,
+            missile_progress: 0.0,
+            missile_tests: 0,
+            space_tier: 0,
+            space_progress: 0.0,
+            space_launches: 0,
+            nuclear_warheads: 0,
+            nuke_tests_conducted: 0,
+            carrier_groups: 0,
+            speeches_delivered: 0,
+            diplomatic_visits: 0,
+            military_drills: 0,
+        }
+    }
+}
+
+impl DefensePrograms {
+    pub fn fighter_tier_label(&self) -> &'static str {
+        match self.fighter_jet_tier {
+            0 => "Legacy 4th-Gen Imports",
+            1 => "4.5-Gen Indigenous Prototype",
+            2 => "5th-Gen Stealth Air Superiority",
+            3 => "6th-Gen AI Wingman Swarm",
+            _ => "Hypersonic Aerospace Dominance",
+        }
+    }
+
+    pub fn missile_tier_label(&self) -> &'static str {
+        match self.missile_tier {
+            0 => "Short-Range Tactical Rockets",
+            1 => "Medium-Range Ballistic Missiles",
+            2 => "Intercontinental Precision Cruise",
+            _ => "Mach-12 Hypersonic Glide Arsenal",
+        }
+    }
+
+    pub fn space_tier_label(&self) -> &'static str {
+        match self.space_tier {
+            0 => "No Orbital Capability",
+            1 => "Recon & Comms Satellite Mesh",
+            2 => "Heavy-Lift Lunar Program",
+            _ => "Sovereign Orbital Command Station",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArmedForces {
+    pub army_divisions: u32,
+    pub tanks_count: u32,
+    pub army_readiness: f64,
+    pub fighter_squadrons: u32,
+    pub air_defense_batteries: u32,
+    pub airforce_readiness: f64,
+    pub destroyers: u32,
+    pub submarines: u32,
+    pub navy_readiness: f64,
+    pub total_arms_sales_bn: f64,
+    pub weapons_contracts_signed: u32,
+}
+
+impl Default for ArmedForces {
+    fn default() -> Self {
+        Self {
+            army_divisions: 12,
+            tanks_count: 650,
+            army_readiness: 66.0,
+            fighter_squadrons: 6,
+            air_defense_batteries: 10,
+            airforce_readiness: 64.0,
+            destroyers: 8,
+            submarines: 4,
+            navy_readiness: 62.0,
+            total_arms_sales_bn: 0.0,
+            weapons_contracts_signed: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LockdownLevel {
+    #[default]
+    None,
+    Targeted,
+    Nationwide,
+}
+
+impl LockdownLevel {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "Open (No Lockdown)",
+            Self::Targeted => "Targeted Quarantine",
+            Self::Nationwide => "Nationwide Lockdown",
+        }
+    }
+
+    pub fn all() -> &'static [LockdownLevel] {
+        &[Self::None, Self::Targeted, Self::Nationwide]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PandemicState {
+    pub active: bool,
+    pub pathogen_name: String,
+    pub severity: f64,         // 0..100
+    pub infected_pct: f64,     // 0..100
+    pub vaccine_progress: f64, // 0..100
+    pub lockdown_level: LockdownLevel,
+}
+
+impl Default for PandemicState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            pathogen_name: "None".into(),
+            severity: 0.0,
+            infected_pct: 0.0,
+            vaccine_progress: 0.0,
+            lockdown_level: LockdownLevel::None,
+        }
     }
 }
 
@@ -568,11 +738,33 @@ pub struct NationState {
     pub annexed_territories: Vec<String>,
     #[serde(default)]
     pub pending_event_target: Option<ForeignPowerId>,
+    #[serde(default)]
+    pub programs: DefensePrograms,
+    #[serde(default)]
+    pub next_emergent_id: u32,
+    #[serde(default)]
+    pub god_surplus_bn: f64,
+    #[serde(default)]
+    pub armed_forces: ArmedForces,
+    #[serde(default)]
+    pub pandemic: PandemicState,
 }
 
 impl NationState {
     pub fn date_label(&self) -> String {
         format!("Q{} {}", self.quarter, self.year)
+    }
+
+    pub fn has_pc(&self, cost: f64) -> bool {
+        self.flags.ledger_rebalance || self.political_capital >= cost
+    }
+
+    pub fn spend_pc(&mut self, cost: f64) {
+        if self.flags.ledger_rebalance {
+            self.political_capital = 100.0;
+        } else {
+            self.political_capital = (self.political_capital - cost).max(0.0);
+        }
     }
 
     pub fn debt_to_gdp(&self) -> f64 {
@@ -602,11 +794,93 @@ impl NationState {
             .count()
     }
 
+    pub fn total_conquerable_powers(&self) -> usize {
+        self.foreign_powers
+            .iter()
+            .filter(|f| f.id != ForeignPowerId::GlobalMonetaryCouncil)
+            .count()
+    }
+
+    pub fn rebel_states_count(&self) -> usize {
+        self.foreign_powers
+            .iter()
+            .filter(|f| f.is_rebel_state && !f.annexed)
+            .count()
+    }
+
     pub fn is_global_hegemon(&self) -> bool {
         self.foreign_powers
             .iter()
             .filter(|f| f.id != ForeignPowerId::GlobalMonetaryCouncil)
             .all(|f| f.annexed || f.puppet_state)
+    }
+
+    pub fn ensure_expanded_world(&mut self) {
+        // Ensure all country names use 100% original fictional names (never real-world nations)
+        for fp in &mut self.foreign_powers {
+            match fp.id {
+                ForeignPowerId::AtlanticRepublic => {
+                    fp.name = "Aethelgard Atlantic Union".into();
+                    fp.short_name = "Aethelgard".into();
+                }
+                ForeignPowerId::PeoplesUnion => {
+                    fp.name = "Volkgrad Collective".into();
+                    fp.short_name = "Volkgrad".into();
+                }
+                ForeignPowerId::EurasianFederation => {
+                    fp.name = "Borealis Iron Federation".into();
+                    fp.short_name = "Borealis".into();
+                }
+                ForeignPowerId::CrescentCoalition => {
+                    fp.name = "Qadira Sun Dominion".into();
+                    fp.short_name = "Qadira".into();
+                }
+                ForeignPowerId::BorderlandRepublic => {
+                    fp.name = "Kestrel Frontier Republic".into();
+                    fp.short_name = "Kestrel".into();
+                }
+                ForeignPowerId::BharatUnion => {
+                    fp.name = "Indravarta Technate".into();
+                    fp.short_name = "Indravarta".into();
+                }
+                ForeignPowerId::NordicConfederation => {
+                    fp.name = "Valheim Frost League".into();
+                    fp.short_name = "Valheim".into();
+                }
+                ForeignPowerId::PacificSyndicate => {
+                    fp.name = "Thalassia Maritime Syndicate".into();
+                    fp.short_name = "Thalassia".into();
+                }
+                ForeignPowerId::AndeanFederation => {
+                    fp.name = "Solterra Cordillera Union".into();
+                    fp.short_name = "Solterra".into();
+                }
+                ForeignPowerId::SaharaAlliance => {
+                    fp.name = "Zahara Equatorial Compact".into();
+                    fp.short_name = "Zahara".into();
+                }
+                ForeignPowerId::AlpineRepublic => {
+                    fp.name = "Montclair Summit Concord".into();
+                    fp.short_name = "Montclair".into();
+                }
+                _ => {}
+            }
+        }
+        let extras = Self::expanded_world_powers();
+        for fp in extras {
+            if !self.foreign_powers.iter().any(|existing| existing.id == fp.id) {
+                self.foreign_powers.push(fp);
+            }
+        }
+        if self.next_emergent_id == 0 {
+            self.next_emergent_id = 1;
+        }
+        if self.programs.fighter_jet_name.trim().is_empty() {
+            self.programs.fighter_jet_name = "Aegis-X Viper".into();
+        }
+        if self.flags.ledger_rebalance && self.god_surplus_bn <= 0.0 {
+            self.god_surplus_bn = 1000.0;
+        }
     }
 
     pub fn faction(&self, id: FactionId) -> &Faction {
@@ -1099,11 +1373,11 @@ impl NationState {
             },
         ];
 
-        let foreign_powers = vec![
+        let mut foreign_powers = vec![
             ForeignPower {
                 id: ForeignPowerId::AtlanticRepublic,
-                name: "United Atlantic Republic".into(),
-                short_name: "UAR (West)".into(),
+                name: "Aethelgard Atlantic Union".into(),
+                short_name: "Aethelgard".into(),
                 ideology: "Liberal Democracy / Free Market".into(),
                 military_power: 95.0,
                 economic_power: 96.0,
@@ -1118,12 +1392,15 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
             ForeignPower {
                 id: ForeignPowerId::PeoplesUnion,
-                name: "People's Socialist Union".into(),
-                short_name: "PSU (East)".into(),
-                ideology: "One-Party Communist / Planned".into(),
+                name: "Volkgrad Collective".into(),
+                short_name: "Volkgrad".into(),
+                ideology: "One-Party Socialist / Planned".into(),
                 military_power: 90.0,
                 economic_power: 88.0,
                 relation: 5.0,
@@ -1137,11 +1414,14 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
             ForeignPower {
                 id: ForeignPowerId::EurasianFederation,
-                name: "Eurasian Federation".into(),
-                short_name: "Eurasia".into(),
+                name: "Borealis Iron Federation".into(),
+                short_name: "Borealis".into(),
                 ideology: "Autocracy / State Capitalism".into(),
                 military_power: 84.0,
                 economic_power: 68.0,
@@ -1156,12 +1436,15 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
             ForeignPower {
                 id: ForeignPowerId::CrescentCoalition,
-                name: "Crescent Theocratic Coalition".into(),
-                short_name: "Crescent Bloc".into(),
-                ideology: "Theocratic Republic / Oil Bloc".into(),
+                name: "Qadira Sun Dominion".into(),
+                short_name: "Qadira".into(),
+                ideology: "Clerical Republic / Energy Bloc".into(),
                 military_power: 64.0,
                 economic_power: 72.0,
                 relation: 4.0,
@@ -1175,12 +1458,15 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
             ForeignPower {
                 id: ForeignPowerId::BorderlandRepublic,
-                name: "Borderland Republic".into(),
-                short_name: "Borderland".into(),
-                ideology: "Disputed Neighbor / Mixed".into(),
+                name: "Kestrel Frontier Republic".into(),
+                short_name: "Kestrel".into(),
+                ideology: "Frontier Neighbor / Mixed".into(),
                 military_power: 46.0,
                 economic_power: 42.0,
                 relation: -12.0,
@@ -1194,6 +1480,9 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
             ForeignPower {
                 id: ForeignPowerId::GlobalMonetaryCouncil,
@@ -1213,8 +1502,12 @@ impl NationState {
                 spy_network: false,
                 annexed: false,
                 puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: 0,
             },
         ];
+        foreign_powers.extend(Self::expanded_world_powers());
 
         Self {
             nation_name: "Republic of Aurelia".into(),
@@ -1297,6 +1590,50 @@ impl NationState {
             rng_state: 0xC0FFEE_2026_1120u64,
             annexed_territories: Vec::new(),
             pending_event_target: None,
+            programs: DefensePrograms::default(),
+            next_emergent_id: 1,
+            god_surplus_bn: 0.0,
+            armed_forces: ArmedForces::default(),
+            pandemic: PandemicState::default(),
         }
+    }
+
+    pub fn expanded_world_powers() -> Vec<ForeignPower> {
+        let make = |id, name: &str, short: &str, ideo: &str, mil, econ, rel, seed| ForeignPower {
+            id,
+            name: name.into(),
+            short_name: short.into(),
+            ideology: ideo.into(),
+            military_power: mil,
+            economic_power: econ,
+            relation: rel,
+            trade_pact: false,
+            defense_alliance: false,
+            sanctioning_us: false,
+            we_sanction_them: false,
+            at_war: false,
+            war_score: 0.0,
+            proxy_funding: false,
+            spy_network: false,
+            annexed: false,
+            puppet_state: false,
+            is_rebel_state: false,
+            parent_origin: None,
+            flag_seed: seed,
+        };
+        vec![
+            make(ForeignPowerId::BharatUnion, "Indravarta Technate", "Indravarta", "Federal Technocracy / Space & Robotics", 82.0, 84.0, 16.0, 1),
+            make(ForeignPowerId::NordicConfederation, "Valheim Frost League", "Valheim", "Social Democracy / Green High-Tech", 58.0, 82.0, 20.0, 2),
+            make(ForeignPowerId::PacificSyndicate, "Thalassia Maritime Syndicate", "Thalassia", "Maritime Capitalism / Chip & Naval Hub", 72.0, 89.0, 14.0, 3),
+            make(ForeignPowerId::AndeanFederation, "Solterra Cordillera Union", "Solterra", "Resource Republic / Rare-Earth & Agro", 52.0, 61.0, 8.0, 4),
+            make(ForeignPowerId::SaharaAlliance, "Zahara Equatorial Compact", "Zahara", "Rising Federation / Minerals & Industry", 56.0, 59.0, 6.0, 5),
+            make(ForeignPowerId::AlpineRepublic, "Montclair Summit Concord", "Montclair", "Neutral Banking / Precision Defense", 54.0, 80.0, 24.0, 6),
+            make(ForeignPowerId::VesperaEmpire, "Grand Duchy of Vespera", "Vespera", "Constitutional Monarchy / Naval Power", 76.0, 78.0, 10.0, 7),
+            make(ForeignPowerId::KharosDesertLeague, "Kharos Oasis Confederation", "Kharos", "Energy Cartel / Sovereign Trade Hub", 62.0, 86.0, 6.0, 8),
+            make(ForeignPowerId::CaledonArchipelago, "Caledon Free Archipelago", "Caledon", "Merchant Federation / Free Ports", 60.0, 83.0, 18.0, 9),
+            make(ForeignPowerId::DrakoriaState, "Iron Republic of Drakoria", "Drakoria", "Militarized Industrial Autocracy", 88.0, 70.0, -18.0, 10),
+            make(ForeignPowerId::LuminaRepublic, "Commonwealth of Lumina", "Lumina", "Eco-Futurist Research Republic", 66.0, 91.0, 22.0, 11),
+            make(ForeignPowerId::OakhavenUnion, "Oakhaven Heartland Federation", "Oakhaven", "Agrarian-Industrial Republic", 55.0, 64.0, 12.0, 12),
+        ]
     }
 }

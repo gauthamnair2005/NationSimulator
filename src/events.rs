@@ -111,6 +111,21 @@ pub fn maybe_trigger_event(state: &mut NationState) {
         candidates.push(("supply_shortage_breadlines", 0.50));
     }
 
+    if state.insurgency_strength >= 62.0 && cooldown_ready(state, "domestic_rebel_uprising") {
+        candidates.push(("domestic_rebel_uprising", 0.70));
+    }
+
+    if state.foreign_powers.iter().any(|p| {
+        p.is_conquerable() && !p.puppet_state && (p.proxy_funding || p.military_power < 55.0)
+    }) && cooldown_ready(state, "foreign_nation_splits")
+    {
+        candidates.push(("foreign_nation_splits", 0.35));
+    }
+
+    if state.programs.fighter_jet_tier >= 1 && cooldown_ready(state, "international_airshow_invite") {
+        candidates.push(("international_airshow_invite", 0.30));
+    }
+
     // 3. General real-world geopolitical & domestic events (occur periodically)
     let ambient = [
         "cyberattack_grid",
@@ -146,6 +161,21 @@ pub fn maybe_trigger_event(state: &mut NationState) {
     let mut roll = state.next_rand() * (total_w + 0.35);
     for (id, w) in candidates {
         if roll <= w {
+            if id == "foreign_nation_splits" {
+                let split_candidates: Vec<ForeignPowerId> = state
+                    .foreign_powers
+                    .iter()
+                    .filter(|p| {
+                        p.is_conquerable()
+                            && !p.puppet_state
+                            && (p.proxy_funding || p.military_power < 55.0)
+                    })
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&tid) = split_candidates.first() {
+                    state.pending_event_target = Some(tid);
+                }
+            }
             state.event_cooldowns.insert(id.to_string(), 10);
             state.active_event = Some(build_event(id, state));
             return;
@@ -496,7 +526,7 @@ fn build_event(id: &str, state: &NationState) -> ActiveEvent {
             title: "Spy Satellites Expose Clandestine Enrichment Facility!".into(),
             category: LogCategory::Military,
             urgency: "DIPLOMATIC CRISIS".into(),
-            briefing: "The United Atlantic Republic has released satellite imagery of your underground centrifuge complex before the UN Security Council, threatening crippling multilateral sanctions unless inspectors are admitted.".into(),
+            briefing: "The Aethelgard Atlantic Union has released satellite imagery of your underground centrifuge complex before the Global Security Assembly, threatening crippling multilateral sanctions unless inspectors are admitted.".into(),
             choices: vec![
                 EventChoice {
                     id: "defy_world_test".into(),
@@ -514,16 +544,16 @@ fn build_event(id: &str, state: &NationState) -> ActiveEvent {
         },
         "border_flashpoint" => ActiveEvent {
             id: id.into(),
-            title: "Artillery Exchange Along the Borderland Frontier!".into(),
+            title: "Artillery Exchange Along the Kestrel Frontier!".into(),
             category: LogCategory::Military,
             urgency: "MILITARY FLASHPOINT".into(),
-            briefing: "Borderland Republic patrols crossed a contested ridge, leaving six of our soldiers dead in an artillery skirmish. Generals demand authorization for a decisive retaliatory push.".into(),
+            briefing: "Kestrel Frontier Republic patrols crossed a contested ridge, leaving six of our soldiers dead in an artillery skirmish. Generals demand authorization for a decisive retaliatory push.".into(),
             choices: vec![
                 EventChoice {
                     id: "launch_full_war".into(),
                     label: "Authorize Full-Scale Military Intervention".into(),
                     description: "Cross the border in force to secure disputed provinces and topple hostile garrisons.".into(),
-                    impact_hint: "Starts War with Borderland Republic! Nationalists +16, Military +12, War costs & diplomatic fallout.".into(),
+                    impact_hint: "Starts War with Kestrel Frontier Republic! Nationalists +16, Military +12, War costs & diplomatic fallout.".into(),
                 },
                 EventChoice {
                     id: "limited_airstrikes".into(),
@@ -1185,6 +1215,90 @@ fn build_event(id: &str, state: &NationState) -> ActiveEvent {
                     label: "Proclaim Supreme Sovereign Expansion & Grand Armada Doctrine".into(),
                     description: "Unite every domestic faction behind total geopolitical dominance.".into(),
                     impact_hint: "Active Troops +300K, All Active Wars +40 War Score, Military & Nationalists +30, Treasury +$250B.".into(),
+                },
+            ],
+        },
+        "domestic_rebel_uprising" => ActiveEvent {
+            id: id.into(),
+            title: "FLASH CRISIS: Separatist Rebels Declare Breakaway State!".into(),
+            category: LogCategory::Crisis,
+            urgency: "TERRITORIAL SECESSION".into(),
+            briefing: format!(
+                "Heavily armed rebel militias have overrun frontier barracks in {} and raised a separatist flag, proclaiming an independent breakaway republic! Generals await your immediate orders.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "rebel_launch_reconquest".into(),
+                    label: "Refuse Secession & Launch Military Reconquest!".into(),
+                    description: "A hostile breakaway Rebel State forms on the map at war with you — crush and re-annex them!".into(),
+                    impact_hint: "Spawns hostile Rebel State at war! Nationalists +12, Military +10.".into(),
+                },
+                EventChoice {
+                    id: "rebel_grant_autonomy".into(),
+                    label: "Grant Sweeping Regional Autonomy & Amnesty ($14B)".into(),
+                    description: "Devolve local budgets and parliament seats to prevent territorial breakup.".into(),
+                    impact_hint: "Treasury -$14B, Insurgency -24, Sectarian Tension -18, Nationalists -14.".into(),
+                },
+                EventChoice {
+                    id: "rebel_special_ops_decapitation".into(),
+                    label: "Deploy Elite Special Forces & Security Crackdown ($10B)".into(),
+                    description: "Strike rebel command bunkers before they can consolidate border defenses.".into(),
+                    impact_hint: "Treasury -$10B, Insurgency -20, Liberties -12, Security +10.".into(),
+                },
+            ],
+        },
+        "foreign_nation_splits" => {
+            let tid = state
+                .pending_event_target
+                .unwrap_or(ForeignPowerId::BorderlandRepublic);
+            let pname = state.foreign(tid).name.clone();
+            ActiveEvent {
+                id: id.into(),
+                title: format!("WORLD SHOCKWAVE: Civil War Fractures {}!", pname),
+                category: LogCategory::Diplomacy,
+                urgency: "NEW NATION FORMING".into(),
+                briefing: format!(
+                    "Separatist provinces inside {} have risen up against their central government and declared independence! World capitals are watching to see whether {} recognizes the new country.",
+                    pname, state.nation_name
+                ),
+                choices: vec![
+                    EventChoice {
+                        id: "split_recognize_back".into(),
+                        label: "Recognize New Breakaway State & Send Diplomatic Mission ($6B)".into(),
+                        description: "Formally welcome the newly carved nation with trade ties and friendly alignment.".into(),
+                        impact_hint: format!("Spawns new friendly country out of {}; Treasury -$6B, {} weakened ~35%.", pname, pname),
+                    },
+                    EventChoice {
+                        id: "split_stay_neutral".into(),
+                        label: "Remain Officially Neutral While Monitoring the Border".into(),
+                        description: "Allow the breakaway state to form independently without antagonizing either side.".into(),
+                        impact_hint: format!("Spawns new neutral country out of {}; Stability +3.", pname),
+                    },
+                ],
+            }
+        }
+        "international_airshow_invite" => ActiveEvent {
+            id: id.into(),
+            title: format!("Global Aerospace Expo Showcases Your {} Fighter!", state.programs.fighter_jet_name),
+            category: LogCategory::Military,
+            urgency: "AEROSPACE PRESTIGE".into(),
+            briefing: format!(
+                "Defense ministers from across the globe have gathered to witness live supersonic demonstrations of your indigenous {} fighter jet programme.",
+                state.programs.fighter_jet_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "airshow_export_contracts".into(),
+                    label: "Sign International Fighter Export Contracts".into(),
+                    description: "Sell export-grade squadrons to friendly powers and reap defense revenue.".into(),
+                    impact_hint: "Treasury +$28B, GDP +$16B, Military Tech +5, Capitalists +10.".into(),
+                },
+                EventChoice {
+                    id: "airshow_keep_classified".into(),
+                    label: "Keep Stealth Avionics Classified & Expand Domestic Squadrons".into(),
+                    description: "Protect cutting-edge air superiority secrets strictly for your own air force.".into(),
+                    impact_hint: "Military Tech +8, Readiness +8, Fighter Progress +35%, Nationalists +10.".into(),
                 },
             ],
         },
@@ -2081,14 +2195,27 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
             state.healthcare_level = (state.healthcare_level + 6.0).min(100.0);
             state.gdp_growth -= 1.5;
             state.approval = (state.approval + 5.0).min(100.0);
-            outcome_detail = "Swift quarantine and hospital funding contained the outbreak at high fiscal cost.".into();
+            crate::simulation::trigger_pandemic_outbreak(
+                state,
+                "Novaria Respiratory Strain-X9",
+                36.0,
+                LockdownLevel::Targeted,
+            );
+            state.pandemic.vaccine_progress = 28.0;
+            outcome_detail = "Targeted quarantine and emergency hospitals activated (Manage Lockdown & Vaccines in Programs & Ops!).".into();
         }
         ("pandemic_outbreak", "keep_economy_open") => {
             state.adjust_faction(FactionId::Capitalists, 10.0, 4.0);
             state.approval = (state.approval - 10.0).max(0.0);
             state.healthcare_level = (state.healthcare_level - 6.0).max(5.0);
             state.stability = (state.stability - 6.0).max(5.0);
-            outcome_detail = "Commerce continued uninterrupted, but overwhelmed clinics sparked public outrage.".into();
+            crate::simulation::trigger_pandemic_outbreak(
+                state,
+                "Novaria Respiratory Strain-X9",
+                54.0,
+                LockdownLevel::None,
+            );
+            outcome_detail = "Commerce stayed open while Strain-X9 surged (Severity 54% — manage Lockdown & Vaccine Sprint!).".into();
         }
         ("oligarch_media_buyout", "block_monopoly") => {
             state.press_freedom = (state.press_freedom + 8.0).min(100.0);
@@ -2096,6 +2223,72 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
             state.adjust_faction(FactionId::Intelligentsia, 10.0, 4.0);
             state.adjust_faction(FactionId::Capitalists, -10.0, -4.0);
             outcome_detail = "Anti-trust regulators blocked the media monopoly, earning praise from journalists.".into();
+        }
+        ("domestic_rebel_uprising", "rebel_launch_reconquest") => {
+            state.adjust_faction(FactionId::Nationalists, 12.0, 5.0);
+            state.adjust_faction(FactionId::Military, 10.0, 5.0);
+            outcome_detail = match crate::simulation::spawn_domestic_rebel_state(state) {
+                Ok(m) => m,
+                Err(e) => e,
+            };
+        }
+        ("domestic_rebel_uprising", "rebel_grant_autonomy") => {
+            state.treasury_bn -= 14.0;
+            state.insurgency_strength = (state.insurgency_strength - 24.0).max(0.0);
+            state.sectarian_tension = (state.sectarian_tension - 18.0).max(0.0);
+            state.stability = (state.stability + 8.0).min(100.0);
+            state.adjust_faction(FactionId::Nationalists, -14.0, -4.0);
+            outcome_detail = "Regional autonomy pact prevented secession and pacified rebel provinces.".into();
+        }
+        ("domestic_rebel_uprising", "rebel_special_ops_decapitation") => {
+            state.treasury_bn -= 10.0;
+            state.insurgency_strength = (state.insurgency_strength - 20.0).max(0.0);
+            state.civil_liberties = (state.civil_liberties - 12.0).max(4.0);
+            state.adjust_faction(FactionId::SecurityApparatus, 10.0, 5.0);
+            outcome_detail = "Precision raids neutralized rebel leadership before a breakaway frontier could form.".into();
+        }
+        ("foreign_nation_splits", "split_recognize_back") => {
+            state.treasury_bn -= 6.0;
+            if let Some(tid) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::spawn_split_country(state, tid, true) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "New breakaway state recognized.".into();
+            }
+        }
+        ("foreign_nation_splits", "split_stay_neutral") => {
+            state.stability = (state.stability + 3.0).min(100.0);
+            if let Some(tid) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::spawn_split_country(state, tid, false) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "Breakaway state formed independently.".into();
+            }
+        }
+        ("international_airshow_invite", "airshow_export_contracts") => {
+            state.treasury_bn += 28.0;
+            state.gdp_bn += 16.0;
+            state.military_tech = (state.military_tech + 5.0).min(100.0);
+            state.adjust_faction(FactionId::Capitalists, 10.0, 4.0);
+            outcome_detail = format!(
+                "Foreign air forces signed $28B in export orders for the {} fighter!",
+                state.programs.fighter_jet_name
+            );
+        }
+        ("international_airshow_invite", "airshow_keep_classified") => {
+            state.military_tech = (state.military_tech + 8.0).min(100.0);
+            state.military_readiness = (state.military_readiness + 8.0).min(100.0);
+            state.programs.fighter_jet_progress += 35.0;
+            if state.programs.fighter_jet_progress >= 100.0 && state.programs.fighter_jet_tier < 4 {
+                state.programs.fighter_jet_tier += 1;
+                state.programs.fighter_jet_progress = 0.0;
+            }
+            state.adjust_faction(FactionId::Nationalists, 10.0, 4.0);
+            outcome_detail = "Classified avionics upgrades pushed domestic air superiority ahead of all rivals.".into();
         }
         ("oligarch_media_buyout", "approve_friendly_media") => {
             state.approval = (state.approval + 7.0).min(100.0);

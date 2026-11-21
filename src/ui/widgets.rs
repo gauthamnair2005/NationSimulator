@@ -1,23 +1,145 @@
 use crate::models::*;
 use eframe::egui::{self, Color32, CornerRadius, FontId, Margin, Pos2, Rect, RichText, Stroke, Vec2};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-pub const BG_CANVAS: Color32 = Color32::from_rgb(11, 16, 26);
-pub const BG_PANEL: Color32 = Color32::from_rgb(18, 25, 38);
-pub const BG_CARD: Color32 = Color32::from_rgb(24, 34, 50);
-pub const BG_HERO: Color32 = Color32::from_rgb(21, 31, 48);
-pub const BORDER_SUBTLE: Color32 = Color32::from_rgb(47, 63, 88);
-pub const BORDER_GOLD: Color32 = Color32::from_rgb(180, 140, 58);
+static DARK_MODE: AtomicBool = AtomicBool::new(true);
 
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(238, 244, 252);
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(150, 168, 194);
+pub fn set_dark_mode(dark: bool) {
+    DARK_MODE.store(dark, Ordering::Relaxed);
+}
 
-pub const ACCENT_BLUE: Color32 = Color32::from_rgb(56, 189, 248);
-pub const ACCENT_CYAN: Color32 = Color32::from_rgb(34, 211, 238);
-pub const ACCENT_GREEN: Color32 = Color32::from_rgb(34, 197, 94);
-pub const ACCENT_AMBER: Color32 = Color32::from_rgb(245, 158, 11);
-pub const ACCENT_GOLD: Color32 = Color32::from_rgb(250, 204, 21);
-pub const ACCENT_RED: Color32 = Color32::from_rgb(239, 68, 68);
-pub const ACCENT_PURPLE: Color32 = Color32::from_rgb(167, 139, 250);
+pub fn is_dark_mode() -> bool {
+    DARK_MODE.load(Ordering::Relaxed)
+}
+
+// Dynamic Theme Palette (Dark = Obsidian War Room | Light = Imperial Parchment Strategy)
+pub fn bg_canvas() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(11, 16, 26)
+    } else {
+        Color32::from_rgb(235, 231, 220)
+    }
+}
+
+pub fn bg_panel() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(18, 25, 38)
+    } else {
+        Color32::from_rgb(245, 242, 234)
+    }
+}
+
+pub fn bg_card() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(24, 34, 50)
+    } else {
+        Color32::from_rgb(253, 251, 246)
+    }
+}
+
+pub fn bg_hero() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(21, 31, 48)
+    } else {
+        Color32::from_rgb(248, 245, 236)
+    }
+}
+
+pub fn bg_inset() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(12, 18, 29)
+    } else {
+        Color32::from_rgb(225, 220, 206)
+    }
+}
+
+pub fn border_subtle() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(47, 63, 88)
+    } else {
+        Color32::from_rgb(196, 188, 169)
+    }
+}
+
+pub fn border_gold() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(188, 146, 56)
+    } else {
+        Color32::from_rgb(168, 118, 24)
+    }
+}
+
+pub fn text_primary() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(238, 244, 252)
+    } else {
+        Color32::from_rgb(22, 31, 46)
+    }
+}
+
+pub fn text_muted() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(150, 168, 194)
+    } else {
+        Color32::from_rgb(86, 98, 118)
+    }
+}
+
+pub fn accent_blue() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(56, 189, 248)
+    } else {
+        Color32::from_rgb(20, 102, 184)
+    }
+}
+
+pub fn accent_cyan() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(34, 211, 238)
+    } else {
+        Color32::from_rgb(14, 116, 144)
+    }
+}
+
+pub fn accent_green() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(34, 197, 94)
+    } else {
+        Color32::from_rgb(21, 128, 61)
+    }
+}
+
+pub fn accent_amber() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(245, 158, 11)
+    } else {
+        Color32::from_rgb(180, 96, 10)
+    }
+}
+
+pub fn accent_gold() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(250, 204, 21)
+    } else {
+        Color32::from_rgb(166, 112, 12)
+    }
+}
+
+pub fn accent_red() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(239, 68, 68)
+    } else {
+        Color32::from_rgb(185, 28, 28)
+    }
+}
+
+pub fn accent_purple() -> Color32 {
+    if is_dark_mode() {
+        Color32::from_rgb(167, 139, 250)
+    } else {
+        Color32::from_rgb(109, 40, 217)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct UiMetrics {
@@ -34,7 +156,7 @@ impl UiMetrics {
         let w = rect.width().max(640.0);
         let h = rect.height().max(480.0);
         let scale = (w / 1380.0).clamp(0.80, 1.38);
-        let sidebar_w = (w * 0.168).clamp(182.0, 272.0);
+        let sidebar_w = (w * 0.168).clamp(184.0, 274.0);
         let flag_h = (28.0 * scale).clamp(22.0, 44.0);
         let flag_w = flag_h * 1.55;
         Self {
@@ -53,16 +175,34 @@ impl UiMetrics {
 }
 
 pub fn fmt_billions(bn: f64) -> String {
-    if bn.abs() >= 1000.0 {
-        format!("${:.2}T", bn / 1000.0)
+    let a = bn.abs();
+    if a >= 1.0e15 {
+        format!("${:.2}Sp", bn / 1.0e15)
+    } else if a >= 1.0e12 {
+        format!("${:.2}Sx", bn / 1.0e12)
+    } else if a >= 1.0e9 {
+        format!("${:.2}Qi", bn / 1.0e9)
+    } else if a >= 1.0e6 {
+        format!("${:.2}Q", bn / 1.0e6)
+    } else if a >= 1.0e3 {
+        format!("${:.2}T", bn / 1.0e3)
     } else {
         format!("${:.1}B", bn)
     }
 }
 
 pub fn fmt_signed_billions(bn: f64) -> String {
-    if bn.abs() >= 1000.0 {
-        format!("{:+.2}T", bn / 1000.0)
+    let a = bn.abs();
+    if a >= 1.0e15 {
+        format!("{:+.2}Sp", bn / 1.0e15)
+    } else if a >= 1.0e12 {
+        format!("{:+.2}Sx", bn / 1.0e12)
+    } else if a >= 1.0e9 {
+        format!("{:+.2}Qi", bn / 1.0e9)
+    } else if a >= 1.0e6 {
+        format!("{:+.2}Q", bn / 1.0e6)
+    } else if a >= 1.0e3 {
+        format!("{:+.2}T", bn / 1.0e3)
     } else {
         format!("{:+.1}B", bn)
     }
@@ -70,24 +210,24 @@ pub fn fmt_signed_billions(bn: f64) -> String {
 
 pub fn card_frame() -> egui::Frame {
     egui::Frame::new()
-        .fill(BG_CARD)
-        .stroke(Stroke::new(1.0_f32, BORDER_SUBTLE))
+        .fill(bg_card())
+        .stroke(Stroke::new(1.0_f32, border_subtle()))
         .corner_radius(CornerRadius::same(8))
         .inner_margin(Margin::same(12))
 }
 
 pub fn hero_card_frame(border_col: Color32) -> egui::Frame {
     egui::Frame::new()
-        .fill(BG_HERO)
-        .stroke(Stroke::new(1.3_f32, border_col))
+        .fill(bg_hero())
+        .stroke(Stroke::new(1.4_f32, border_col))
         .corner_radius(CornerRadius::same(10))
         .inner_margin(Margin::same(12))
 }
 
 pub fn panel_frame() -> egui::Frame {
     egui::Frame::new()
-        .fill(BG_PANEL)
-        .stroke(Stroke::new(1.0_f32, BORDER_SUBTLE))
+        .fill(bg_panel())
+        .stroke(Stroke::new(1.0_f32, border_subtle()))
         .corner_radius(CornerRadius::same(7))
         .inner_margin(Margin::same(10))
 }
@@ -95,18 +235,18 @@ pub fn panel_frame() -> egui::Frame {
 pub fn severity_color(value: f64, high_is_good: bool) -> Color32 {
     if high_is_good {
         if value >= 65.0 {
-            ACCENT_GREEN
+            accent_green()
         } else if value >= 40.0 {
-            ACCENT_AMBER
+            accent_amber()
         } else {
-            ACCENT_RED
+            accent_red()
         }
     } else if value <= 25.0 {
-        ACCENT_GREEN
+        accent_green()
     } else if value <= 55.0 {
-        ACCENT_AMBER
+        accent_amber()
     } else {
-        ACCENT_RED
+        accent_red()
     }
 }
 
@@ -115,7 +255,8 @@ pub fn badge(ui: &mut egui::Ui, text: &str, color: Color32) {
 }
 
 pub fn badge_scaled(ui: &mut egui::Ui, text: &str, color: Color32, font_size: f32) {
-    let bg = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 36);
+    let alpha = if is_dark_mode() { 36 } else { 24 };
+    let bg = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha);
     let pad_x = (font_size * 0.65).round() as i8;
     let pad_y = (font_size * 0.22).round().max(2.0) as i8;
     egui::Frame::new()
@@ -136,8 +277,9 @@ pub fn draw_status_flag_chip(
     color: Color32,
     scale: f32,
 ) {
-    let bg = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 26);
-    let border = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 160);
+    let alpha = if is_dark_mode() { 26 } else { 20 };
+    let bg = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha);
+    let border = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 170);
     let pad_x = (8.0 * scale).clamp(6.0, 12.0) as i8;
     let pad_y = (4.5 * scale).clamp(3.0, 7.0) as i8;
     let resp = egui::Frame::new()
@@ -174,12 +316,17 @@ pub fn kpi_card(
     width: f32,
 ) {
     let scale = (width / 155.0).clamp(0.85, 1.25);
-    let top_tint = Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 18);
+    let top_tint = Color32::from_rgba_unmultiplied(
+        accent.r(),
+        accent.g(),
+        accent.b(),
+        if is_dark_mode() { 24 } else { 32 },
+    );
     egui::Frame::new()
-        .fill(BG_CARD)
+        .fill(bg_card())
         .stroke(Stroke::new(
-            1.0_f32,
-            Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 95),
+            1.1_f32,
+            Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 110),
         ))
         .corner_radius(CornerRadius::same(8))
         .inner_margin(Margin::symmetric(10, 8))
@@ -201,7 +348,7 @@ pub fn kpi_card(
                         .rect_filled(rect, CornerRadius::same(2), accent);
                     ui.label(
                         RichText::new(title)
-                            .color(TEXT_MUTED)
+                            .color(text_muted())
                             .size((10.8 * scale).clamp(9.5, 13.0))
                             .strong(),
                     );
@@ -209,7 +356,7 @@ pub fn kpi_card(
                 ui.add_space(2.0);
                 ui.label(
                     RichText::new(value)
-                        .color(TEXT_PRIMARY)
+                        .color(text_primary())
                         .size((17.5 * scale).clamp(15.0, 22.0))
                         .strong(),
                 );
@@ -226,7 +373,7 @@ pub fn meter_bar(ui: &mut egui::Ui, label: &str, value: f64, high_is_good: bool)
     let clamped = value.clamp(0.0, 100.0);
     let col = severity_color(clamped, high_is_good);
     ui.horizontal(|ui| {
-        ui.label(RichText::new(label).color(TEXT_PRIMARY).size(12.5));
+        ui.label(RichText::new(label).color(text_primary()).size(12.5));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
                 RichText::new(format!("{:.1}%", clamped))
@@ -239,7 +386,7 @@ pub fn meter_bar(ui: &mut egui::Ui, label: &str, value: f64, high_is_good: bool)
     let desired = Vec2::new(ui.available_width().max(80.0), 8.0);
     let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
     let painter = ui.painter();
-    painter.rect_filled(rect, CornerRadius::same(4), Color32::from_rgb(13, 19, 30));
+    painter.rect_filled(rect, CornerRadius::same(4), bg_inset());
     let fill_w = rect.width() * (clamped as f32 / 100.0);
     if fill_w > 1.0 {
         let fill_rect = Rect::from_min_size(rect.min, Vec2::new(fill_w, rect.height()));
@@ -257,20 +404,20 @@ pub fn meter_bar(ui: &mut egui::Ui, label: &str, value: f64, high_is_good: bool)
 pub fn signed_relation_bar(ui: &mut egui::Ui, value: f64) {
     let clamped = value.clamp(-100.0, 100.0);
     let col = if clamped >= 25.0 {
-        ACCENT_GREEN
+        accent_green()
     } else if clamped >= -20.0 {
-        ACCENT_AMBER
+        accent_amber()
     } else {
-        ACCENT_RED
+        accent_red()
     };
     let desired = Vec2::new(110.0, 9.0);
     let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
     let painter = ui.painter();
-    painter.rect_filled(rect, CornerRadius::same(4), Color32::from_rgb(13, 19, 30));
+    painter.rect_filled(rect, CornerRadius::same(4), bg_inset());
     let mid_x = rect.center().x;
     painter.line_segment(
         [Pos2::new(mid_x, rect.top()), Pos2::new(mid_x, rect.bottom())],
-        Stroke::new(1.0_f32, BORDER_SUBTLE),
+        Stroke::new(1.0_f32, border_subtle()),
     );
     let frac = (clamped as f32) / 100.0;
     let bar_rect = if frac >= 0.0 {
@@ -294,20 +441,20 @@ pub fn draw_war_frontline_bar(
     war_score: f64,
 ) {
     let ws = war_score.clamp(-100.0, 100.0) as f32;
-    let frac = (ws + 100.0) / 200.0; // 0.0 = enemy victory, 0.5 = stalemate, 1.0 = our victory
+    let frac = (ws + 100.0) / 200.0;
     let annex_frac = (70.0 + 100.0) / 200.0;
 
     ui.horizontal(|ui| {
         ui.label(
             RichText::new(format!("⚔ FRONT: {}", our_name))
-                .color(ACCENT_GREEN)
+                .color(accent_green())
                 .size(11.0)
                 .strong(),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
                 RichText::new(format!("{} 🛡", enemy_name))
-                    .color(ACCENT_RED)
+                    .color(accent_red())
                     .size(11.0)
                     .strong(),
             );
@@ -318,76 +465,86 @@ pub fn draw_war_frontline_bar(
     let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
     let p = ui.painter();
 
-    // Enemy side background
     p.rect_filled(
         rect,
         CornerRadius::same(4),
-        Color32::from_rgba_unmultiplied(220, 50, 50, 110),
+        Color32::from_rgba_unmultiplied(210, 48, 48, 125),
     );
-    // Our territory push
     let split_x = rect.left() + rect.width() * frac;
     let our_rect = Rect::from_min_max(rect.min, Pos2::new(split_x, rect.bottom()));
     p.rect_filled(
         our_rect,
         CornerRadius::same(4),
-        Color32::from_rgba_unmultiplied(34, 197, 94, 175),
+        Color32::from_rgba_unmultiplied(30, 185, 90, 185),
     );
-    // Center 0 marker
     let mid_x = rect.center().x;
     p.line_segment(
         [Pos2::new(mid_x, rect.top()), Pos2::new(mid_x, rect.bottom())],
-        Stroke::new(1.0_f32, Color32::from_white_alpha(120)),
+        Stroke::new(1.0_f32, Color32::from_white_alpha(150)),
     );
-    // +70 Annexation threshold marker
     let annex_x = rect.left() + rect.width() * annex_frac;
     p.line_segment(
         [
             Pos2::new(annex_x, rect.top() - 1.0),
             Pos2::new(annex_x, rect.bottom() + 1.0),
         ],
-        Stroke::new(2.0_f32, ACCENT_GOLD),
+        Stroke::new(2.0_f32, accent_gold()),
     );
-    // Frontline spearhead indicator
-    p.circle_filled(Pos2::new(split_x, rect.center().y), 5.0, TEXT_PRIMARY);
+    p.circle_filled(Pos2::new(split_x, rect.center().y), 5.0, text_primary());
     p.circle_stroke(
         Pos2::new(split_x, rect.center().y),
         5.0,
-        Stroke::new(1.5_f32, BG_CANVAS),
+        Stroke::new(1.5_f32, bg_canvas()),
     );
-    // Frame border
     p.rect_stroke(
         rect,
         CornerRadius::same(4),
-        Stroke::new(1.0_f32, BORDER_SUBTLE),
+        Stroke::new(1.0_f32, border_subtle()),
         egui::StrokeKind::Inside,
     );
     ui.label(
         RichText::new(format!(
-            "War Score: {:+.0}%  |  Gold tick = +70% Direct Annexation threshold  |  +95% = Total Capitulation",
+            "War Score: {:+.0}%  |  Gold tick = +70% Direct Annexation  |  +95% = Total Capitulation",
             war_score
         ))
-        .color(if war_score >= 70.0 { ACCENT_GOLD } else { TEXT_MUTED })
+        .color(if war_score >= 70.0 { accent_gold() } else { text_muted() })
         .size(10.5),
     );
 }
 
-fn draw_star_5(painter: &egui::Painter, center: Pos2, outer_r: f32, color: Color32) {
-    let inner_r = outer_r * 0.42;
-    let mut pts = Vec::with_capacity(10);
-    for i in 0..10 {
-        let angle = -std::f32::consts::FRAC_PI_2 + (i as f32) * std::f32::consts::PI / 5.0;
+fn draw_diamond(painter: &egui::Painter, center: Pos2, rx: f32, ry: f32, color: Color32) {
+    let pts = vec![
+        Pos2::new(center.x, center.y - ry),
+        Pos2::new(center.x + rx, center.y),
+        Pos2::new(center.x, center.y + ry),
+        Pos2::new(center.x - rx, center.y),
+    ];
+    painter.add(egui::Shape::convex_polygon(pts, color, Stroke::NONE));
+}
+
+fn draw_hex(painter: &egui::Painter, center: Pos2, r: f32, color: Color32) {
+    let mut pts = Vec::with_capacity(6);
+    for i in 0..6 {
+        let a = (i as f32) * std::f32::consts::FRAC_PI_3;
+        pts.push(Pos2::new(center.x + r * a.cos(), center.y + r * a.sin()));
+    }
+    painter.add(egui::Shape::convex_polygon(pts, color, Stroke::NONE));
+}
+
+fn draw_compass_star(painter: &egui::Painter, center: Pos2, outer_r: f32, color: Color32) {
+    let inner_r = outer_r * 0.34;
+    let mut pts = Vec::with_capacity(8);
+    for i in 0..8 {
+        let angle = -std::f32::consts::FRAC_PI_2 + (i as f32) * std::f32::consts::FRAC_PI_4;
         let r = if i % 2 == 0 { outer_r } else { inner_r };
         pts.push(Pos2::new(
             center.x + r * angle.cos(),
             center.y + r * angle.sin(),
         ));
     }
-    // Draw triangles from center so concave star fills cleanly in egui
-    for i in 0..10 {
-        let a = pts[i];
-        let b = pts[(i + 1) % 10];
+    for i in 0..8 {
         painter.add(egui::Shape::convex_polygon(
-            vec![center, a, b],
+            vec![center, pts[i], pts[(i + 1) % 8]],
             color,
             Stroke::NONE,
         ));
@@ -395,32 +552,30 @@ fn draw_star_5(painter: &egui::Painter, center: Pos2, outer_r: f32, color: Color
 }
 
 fn paint_flag_finish(painter: &egui::Painter, rect: Rect, gold_border: bool) {
-    // Diagonal satin fabric sheen
     let sheen = vec![
         rect.left_top(),
-        Pos2::new(rect.left() + rect.width() * 0.52, rect.top()),
+        Pos2::new(rect.left() + rect.width() * 0.50, rect.top()),
         Pos2::new(rect.left() + rect.width() * 0.22, rect.bottom()),
         rect.left_bottom(),
     ];
     painter.add(egui::Shape::convex_polygon(
         sheen,
-        Color32::from_rgba_unmultiplied(255, 255, 255, 22),
+        Color32::from_rgba_unmultiplied(255, 255, 255, 24),
         Stroke::NONE,
     ));
-    // Subtle fold shadow
     let shade = Rect::from_min_max(
-        Pos2::new(rect.left() + rect.width() * 0.62, rect.top()),
+        Pos2::new(rect.left() + rect.width() * 0.64, rect.top()),
         Pos2::new(rect.left() + rect.width() * 0.78, rect.bottom()),
     );
     painter.rect_filled(
         shade,
         CornerRadius::ZERO,
-        Color32::from_rgba_unmultiplied(0, 0, 0, 26),
+        Color32::from_rgba_unmultiplied(0, 0, 0, 22),
     );
     let border_col = if gold_border {
-        ACCENT_GOLD
+        Color32::from_rgb(240, 192, 48)
     } else {
-        Color32::from_rgb(130, 150, 180)
+        border_subtle()
     };
     painter.rect_stroke(
         rect,
@@ -453,6 +608,7 @@ pub fn draw_nation_flag_from_spec(
     resp
 }
 
+/// 100% Original Fictional Heraldry for Player Nations (no resemblance to real-world flags)
 pub fn paint_nation_flag_at(
     painter: &egui::Painter,
     rect: Rect,
@@ -465,143 +621,71 @@ pub fn paint_nation_flag_at(
     let w = rect.width();
     let h = rect.height();
     let c = rect.center();
+    let gold = Color32::from_rgb(245, 198, 42);
+    let silver = Color32::from_rgb(236, 242, 248);
 
-    // Base field determined by Regime
     match regime {
         RegimeType::LiberalDemocracy => {
-            // Classic horizontal tricolor: Deep Azure / Crisp White / Royal Crimson
-            let s1 = Rect::from_min_size(rect.min, Vec2::new(w, h / 3.0));
-            let s2 = Rect::from_min_size(Pos2::new(rect.left(), rect.top() + h / 3.0), Vec2::new(w, h / 3.0));
-            let s3 = Rect::from_min_size(Pos2::new(rect.left(), rect.top() + 2.0 * h / 3.0), Vec2::new(w, h / 3.0));
-            painter.rect_filled(s1, CornerRadius::same(2), Color32::from_rgb(29, 78, 216));
-            painter.rect_filled(s2, CornerRadius::ZERO, Color32::from_rgb(241, 245, 249));
-            painter.rect_filled(s3, CornerRadius::same(2), Color32::from_rgb(190, 24, 60));
-            draw_star_5(painter, c, h * 0.20, Color32::from_rgb(234, 179, 8));
+            // Sapphire & Silver diagonal split with Twin Compass Crest
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(24, 92, 168));
+            let diag = vec![rect.right_top(), rect.right_bottom(), Pos2::new(rect.left() + w * 0.28, rect.bottom())];
+            painter.add(egui::Shape::convex_polygon(diag, Color32::from_rgb(15, 148, 136), Stroke::NONE));
+            draw_diamond(painter, c, w * 0.20, h * 0.34, silver);
+            draw_compass_star(painter, c, h * 0.24, gold);
         }
         RegimeType::SocialDemocracy => {
-            // Nordic cross: Cobalt Blue field with Golden-Yellow Cross
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(14, 116, 144));
-            let cross_w = h * 0.22;
-            painter.rect_filled(
-                Rect::from_min_size(Pos2::new(rect.left(), c.y - cross_w * 0.5), Vec2::new(w, cross_w)),
-                CornerRadius::ZERO,
-                ACCENT_GOLD,
-            );
-            painter.rect_filled(
-                Rect::from_min_size(Pos2::new(rect.left() + w * 0.30, rect.top()), Vec2::new(cross_w, h)),
-                CornerRadius::ZERO,
-                ACCENT_GOLD,
-            );
+            // Deep Teal & Amber chevron banner with Golden Hexagon
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(15, 98, 118));
+            let chev = vec![rect.left_top(), Pos2::new(c.x, c.y), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(chev, Color32::from_rgb(217, 132, 26), Stroke::NONE));
+            draw_hex(painter, Pos2::new(c.x + w * 0.14, c.y), h * 0.24, silver);
+            draw_compass_star(painter, Pos2::new(c.x + w * 0.14, c.y), h * 0.16, gold);
         }
         RegimeType::OnePartyCommunist => {
-            // Bold Socialist Crimson banner with golden vanguard star & canton stripe
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(185, 28, 28));
-            painter.rect_filled(
-                Rect::from_min_size(Pos2::new(rect.left(), rect.bottom() - h * 0.16), Vec2::new(w, h * 0.16)),
-                CornerRadius::same(1),
-                Color32::from_rgb(234, 179, 8),
-            );
-            draw_star_5(
-                painter,
-                Pos2::new(rect.left() + w * 0.28, rect.top() + h * 0.42),
-                h * 0.27,
-                ACCENT_GOLD,
-            );
+            // Deep Terracotta-Crimson & Obsidian diagonal gear-diamond banner
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(156, 26, 48));
+            let corner = vec![rect.left_bottom(), rect.right_bottom(), rect.right_top()];
+            painter.add(egui::Shape::convex_polygon(corner, Color32::from_rgb(32, 34, 46), Stroke::NONE));
+            draw_hex(painter, c, h * 0.29, gold);
+            draw_diamond(painter, c, h * 0.16, h * 0.16, Color32::from_rgb(156, 26, 48));
         }
         RegimeType::MilitaryDictatorship => {
-            // Armored Slate / Olive & Crimson chevron banner
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(38, 56, 46));
-            let diag = vec![
-                rect.left_top(),
-                Pos2::new(rect.left() + w * 0.45, c.y),
-                rect.left_bottom(),
-            ];
-            painter.add(egui::Shape::convex_polygon(
-                diag,
-                Color32::from_rgb(153, 27, 27),
-                Stroke::NONE,
-            ));
-            let shield = vec![
-                Pos2::new(c.x + w * 0.10, c.y - h * 0.24),
-                Pos2::new(c.x + w * 0.24, c.y),
-                Pos2::new(c.x + w * 0.10, c.y + h * 0.24),
-                Pos2::new(c.x - w * 0.04, c.y),
-            ];
-            painter.add(egui::Shape::convex_polygon(shield, ACCENT_GOLD, Stroke::NONE));
+            // Gunmetal Slate & Bronze twin-chevron with Steel Shield
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(44, 54, 68));
+            let chev = vec![rect.left_top(), Pos2::new(rect.left() + w * 0.44, c.y), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(chev, Color32::from_rgb(176, 88, 32), Stroke::NONE));
+            draw_diamond(painter, Pos2::new(c.x + w * 0.12, c.y), w * 0.16, h * 0.28, gold);
         }
         RegimeType::AbsoluteAutocracy => {
-            // Imperial Royal Purple & Obsidian split with golden crown diamond
-            painter.rect_filled(
-                Rect::from_min_size(rect.min, Vec2::new(w, h * 0.5)),
-                CornerRadius::same(2),
-                Color32::from_rgb(88, 28, 135),
-            );
-            painter.rect_filled(
-                Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.5)),
-                CornerRadius::same(2),
-                Color32::from_rgb(23, 28, 42),
-            );
-            painter.rect_filled(
-                Rect::from_min_size(Pos2::new(rect.left(), c.y - h * 0.07), Vec2::new(w, h * 0.14)),
-                CornerRadius::ZERO,
-                ACCENT_GOLD,
-            );
-            draw_star_5(painter, c, h * 0.24, ACCENT_GOLD);
+            // Royal Amethyst & Obsidian with Imperial Gold Band & Compass Crest
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.5)), CornerRadius::same(2), Color32::from_rgb(92, 32, 142));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.5)), CornerRadius::same(2), Color32::from_rgb(20, 26, 40));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y - h * 0.08), Vec2::new(w, h * 0.16)), CornerRadius::ZERO, gold);
+            draw_compass_star(painter, c, h * 0.28, silver);
         }
         RegimeType::TheocraticRepublic => {
-            // Sacred Emerald & Ivory vertical panels with Golden Crescent/Sun
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(6, 95, 70));
-            painter.rect_filled(
-                Rect::from_min_size(rect.min, Vec2::new(w * 0.26, h)),
-                CornerRadius::same(2),
-                Color32::from_rgb(241, 245, 249),
-            );
-            let emblem_c = Pos2::new(rect.left() + w * 0.62, c.y);
-            painter.circle_filled(emblem_c, h * 0.24, ACCENT_GOLD);
-            painter.circle_filled(
-                Pos2::new(emblem_c.x + h * 0.09, emblem_c.y - h * 0.03),
-                h * 0.19,
-                Color32::from_rgb(6, 95, 70),
-            );
-            draw_star_5(
-                painter,
-                Pos2::new(emblem_c.x + h * 0.16, emblem_c.y - h * 0.02),
-                h * 0.11,
-                ACCENT_GOLD,
-            );
+            // Deep Ochre-Bronze & Ivory geometric sunburst (no real-world religious symbols)
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(142, 96, 28));
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.26, h)), CornerRadius::same(2), silver);
+            draw_compass_star(painter, Pos2::new(rect.left() + w * 0.62, c.y), h * 0.30, gold);
+            painter.circle_filled(Pos2::new(rect.left() + w * 0.62, c.y), h * 0.11, Color32::from_rgb(28, 88, 128));
         }
         RegimeType::OligarchicRepublic => {
-            // Sovereign Navy with Golden Rhombus & Emerald Core
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(15, 36, 74));
-            let diamond = vec![
-                Pos2::new(c.x, rect.top() + h * 0.14),
-                Pos2::new(rect.right() - w * 0.18, c.y),
-                Pos2::new(c.x, rect.bottom() - h * 0.14),
-                Pos2::new(rect.left() + w * 0.18, c.y),
-            ];
-            painter.add(egui::Shape::convex_polygon(diamond, ACCENT_GOLD, Stroke::NONE));
-            painter.circle_filled(c, h * 0.16, Color32::from_rgb(16, 185, 129));
+            // Midnight Navy & Emerald-Gold Lozenge Banner
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(18, 38, 76));
+            draw_diamond(painter, c, w * 0.34, h * 0.38, gold);
+            draw_hex(painter, c, h * 0.20, Color32::from_rgb(16, 168, 128));
         }
     }
 
-    // Subtle economic/religious accent pip in upper-right when distinct
     if economy == EconomicSystem::WarEconomy {
-        painter.circle_filled(
-            Pos2::new(rect.right() - w * 0.14, rect.top() + h * 0.22),
-            h * 0.10,
-            ACCENT_RED,
-        );
+        painter.circle_filled(Pos2::new(rect.right() - w * 0.14, rect.top() + h * 0.22), h * 0.10, Color32::from_rgb(239, 68, 68));
     } else if religion == ReligionPolicy::TheocraticLaw && regime != RegimeType::TheocraticRepublic {
-        painter.circle_stroke(
-            c,
-            h * 0.30,
-            Stroke::new(1.3_f32, ACCENT_GOLD),
-        );
+        painter.circle_stroke(c, h * 0.31, Stroke::new(1.3_f32, gold));
     }
 
-    // Golden Mandate / Hegemon radiant laurel ring
     if god_mode || hegemon {
-        painter.circle_stroke(c, h * 0.36, Stroke::new(1.5_f32, ACCENT_GOLD));
+        painter.circle_stroke(c, h * 0.37, Stroke::new(1.6_f32, gold));
     }
 
     paint_flag_finish(painter, rect, god_mode || hegemon);
@@ -618,110 +702,175 @@ pub fn draw_foreign_flag(
     resp
 }
 
+/// 100% Original Fictional Flags for all 18 World Powers + Emergent/Rebel Nations
 pub fn paint_foreign_flag_at(painter: &egui::Painter, rect: Rect, power: &ForeignPower) {
     let w = rect.width();
     let h = rect.height();
     let c = rect.center();
+    let gold = Color32::from_rgb(245, 198, 42);
+    let silver = Color32::from_rgb(236, 242, 248);
 
     match power.id {
         ForeignPowerId::AtlanticRepublic => {
-            // 5 horizontal stripes + deep navy canton with golden star
-            let stripe_h = h / 5.0;
-            for i in 0..5 {
-                let col = if i % 2 == 0 {
-                    Color32::from_rgb(185, 28, 45)
-                } else {
-                    Color32::from_rgb(241, 245, 249)
-                };
-                painter.rect_filled(
-                    Rect::from_min_size(Pos2::new(rect.left(), rect.top() + i as f32 * stripe_h), Vec2::new(w, stripe_h + 0.5)),
-                    CornerRadius::ZERO,
-                    col,
-                );
-            }
-            let canton = Rect::from_min_size(rect.min, Vec2::new(w * 0.44, h * 0.60));
-            painter.rect_filled(canton, CornerRadius::same(1), Color32::from_rgb(23, 52, 118));
-            draw_star_5(painter, canton.center(), h * 0.16, Color32::from_rgb(250, 204, 21));
+            // Aethelgard: Cobalt & Silver geometric chevron + Twin Gold Compass
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(22, 66, 138));
+            let tri = vec![rect.left_top(), Pos2::new(c.x, c.y), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(tri, silver, Stroke::NONE));
+            draw_compass_star(painter, Pos2::new(rect.left() + w * 0.20, c.y), h * 0.20, Color32::from_rgb(22, 66, 138));
+            draw_compass_star(painter, Pos2::new(c.x + w * 0.22, c.y), h * 0.22, gold);
         }
         ForeignPowerId::PeoplesUnion => {
-            // Crimson field with prominent gold star + 3 arc stars
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(190, 20, 32));
-            draw_star_5(
-                painter,
-                Pos2::new(rect.left() + w * 0.25, rect.top() + h * 0.38),
-                h * 0.24,
-                ACCENT_GOLD,
-            );
-            for &(dx, dy) in &[(0.48, 0.22), (0.54, 0.42), (0.47, 0.60)] {
-                draw_star_5(
-                    painter,
-                    Pos2::new(rect.left() + w * dx, rect.top() + h * dy),
-                    h * 0.09,
-                    ACCENT_GOLD,
-                );
-            }
+            // Volkgrad: Burgundy & Charcoal diagonal + Golden Hex Gear
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(138, 28, 52));
+            let low = vec![rect.left_bottom(), rect.right_bottom(), rect.right_top()];
+            painter.add(egui::Shape::convex_polygon(low, Color32::from_rgb(36, 40, 52), Stroke::NONE));
+            draw_hex(painter, c, h * 0.27, gold);
         }
         ForeignPowerId::EurasianFederation => {
-            // White / Royal Blue / Crimson horizontal tricolor with gold crest
-            let sh = h / 3.0;
-            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, sh)), CornerRadius::same(1), Color32::from_rgb(241, 245, 249));
-            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.top() + sh), Vec2::new(w, sh)), CornerRadius::ZERO, Color32::from_rgb(29, 78, 216));
-            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.top() + 2.0 * sh), Vec2::new(w, sh)), CornerRadius::same(1), Color32::from_rgb(185, 28, 28));
-            painter.circle_filled(c, h * 0.15, ACCENT_GOLD);
+            // Borealis: Deep Indigo & Bronze split + Silver Twin-Diamond
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(30, 42, 92));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(138, 82, 42));
+            draw_diamond(painter, Pos2::new(c.x - w * 0.14, c.y), w * 0.11, h * 0.26, silver);
+            draw_diamond(painter, Pos2::new(c.x + w * 0.14, c.y), w * 0.11, h * 0.26, gold);
         }
         ForeignPowerId::CrescentCoalition => {
-            // Rich Emerald & Black hoist with Golden Crescent
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(5, 110, 74));
-            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.22, h)), CornerRadius::same(1), Color32::from_rgb(22, 26, 36));
-            let ec = Pos2::new(rect.left() + w * 0.58, c.y);
-            painter.circle_filled(ec, h * 0.25, ACCENT_GOLD);
-            painter.circle_filled(Pos2::new(ec.x + h * 0.09, ec.y - h * 0.02), h * 0.20, Color32::from_rgb(5, 110, 74));
-            draw_star_5(painter, Pos2::new(ec.x + h * 0.17, ec.y - h * 0.02), h * 0.11, ACCENT_GOLD);
+            // Qadira Sun Dominion: Amber Ochre & Deep Sapphire Sunburst
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(186, 118, 28));
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.22)), CornerRadius::same(1), Color32::from_rgb(20, 54, 108));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.bottom() - h * 0.22), Vec2::new(w, h * 0.22)), CornerRadius::same(1), Color32::from_rgb(20, 54, 108));
+            draw_compass_star(painter, c, h * 0.26, silver);
         }
         ForeignPowerId::BorderlandRepublic => {
-            // Sky Azure over Golden Wheat with crisp white mountain chevron
-            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.55)), CornerRadius::same(1), Color32::from_rgb(14, 116, 185));
-            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.top() + h * 0.55), Vec2::new(w, h * 0.45)), CornerRadius::same(1), Color32::from_rgb(217, 155, 22));
-            let peak = vec![
-                Pos2::new(c.x, rect.top() + h * 0.20),
-                Pos2::new(c.x + w * 0.22, rect.bottom() - h * 0.15),
-                Pos2::new(c.x - w * 0.22, rect.bottom() - h * 0.15),
-            ];
-            painter.add(egui::Shape::convex_polygon(peak, Color32::from_rgb(241, 245, 249), Stroke::NONE));
+            // Kestrel Frontier: Teal & Slate vertical split + Silver Fortress Diamond
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.5, h)), CornerRadius::same(1), Color32::from_rgb(18, 128, 124));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(c.x, rect.top()), Vec2::new(w * 0.5, h)), CornerRadius::same(1), Color32::from_rgb(54, 66, 86));
+            draw_diamond(painter, c, w * 0.18, h * 0.30, silver);
+            painter.circle_filled(c, h * 0.10, gold);
         }
         ForeignPowerId::GlobalMonetaryCouncil => {
-            // UN-inspired Royal Teal/Blue with Golden Globe Rings
-            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(18, 86, 150));
-            painter.circle_stroke(c, h * 0.29, Stroke::new(1.5_f32, ACCENT_GOLD));
-            painter.circle_stroke(c, h * 0.16, Stroke::new(1.1_f32, Color32::from_rgb(241, 245, 249)));
-            painter.line_segment(
-                [Pos2::new(c.x - h * 0.28, c.y), Pos2::new(c.x + h * 0.28, c.y)],
-                Stroke::new(1.0_f32, ACCENT_GOLD),
-            );
-            painter.line_segment(
-                [Pos2::new(c.x, c.y - h * 0.28), Pos2::new(c.x, c.y + h * 0.28)],
-                Stroke::new(1.0_f32, ACCENT_GOLD),
-            );
+            // GMC: Teal-Indigo with Golden Octagonal Lattice
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(18, 86, 146));
+            painter.circle_stroke(c, h * 0.30, Stroke::new(1.5_f32, gold));
+            draw_diamond(painter, c, h * 0.22, h * 0.22, silver);
+            painter.circle_filled(c, h * 0.08, Color32::from_rgb(18, 86, 146));
+        }
+        ForeignPowerId::BharatUnion => {
+            // Indravarta Technate: Deep Bronze, Teal & Amber Geometric Lotus-Hex
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(16, 104, 112));
+            let band = vec![rect.left_top(), Pos2::new(rect.left() + w * 0.38, rect.top()), Pos2::new(rect.left() + w * 0.18, rect.bottom()), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(band, Color32::from_rgb(204, 118, 36), Stroke::NONE));
+            draw_hex(painter, Pos2::new(c.x + w * 0.10, c.y), h * 0.26, gold);
+            draw_compass_star(painter, Pos2::new(c.x + w * 0.10, c.y), h * 0.16, Color32::from_rgb(16, 104, 112));
+        }
+        ForeignPowerId::NordicConfederation => {
+            // Valheim Frost League: Arctic Cyan & Violet Aurora Banner + Silver Ice Star
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.52)), CornerRadius::same(1), Color32::from_rgb(38, 146, 196));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.50)), CornerRadius::same(1), Color32::from_rgb(76, 46, 138));
+            draw_compass_star(painter, c, h * 0.30, silver);
+        }
+        ForeignPowerId::PacificSyndicate => {
+            // Thalassia Maritime: Deep Sea-Teal & Coral Wave + Golden Trident Diamond
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(12, 82, 114));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.bottom() - h * 0.28), Vec2::new(w, h * 0.28)), CornerRadius::same(1), Color32::from_rgb(218, 96, 82));
+            draw_diamond(painter, Pos2::new(c.x, c.y - h * 0.08), w * 0.18, h * 0.26, gold);
+        }
+        ForeignPowerId::AndeanFederation => {
+            // Solterra Cordillera: Terracotta & Forest Emerald Diagonal + Gold Hex
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(176, 76, 44));
+            let lower = vec![rect.left_bottom(), rect.right_bottom(), rect.right_top()];
+            painter.add(egui::Shape::convex_polygon(lower, Color32::from_rgb(24, 118, 76), Stroke::NONE));
+            draw_hex(painter, c, h * 0.26, gold);
+        }
+        ForeignPowerId::SaharaAlliance => {
+            // Zahara Equatorial: Deep Plum-Violet & Copper Triband + Ivory Shield
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(96, 36, 118));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y - h * 0.16), Vec2::new(w, h * 0.32)), CornerRadius::ZERO, Color32::from_rgb(198, 108, 42));
+            draw_diamond(painter, c, w * 0.16, h * 0.30, silver);
+        }
+        ForeignPowerId::AlpineRepublic => {
+            // Montclair Summit: Slate Silver & Royal Indigo + Golden Crystal Peak
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(56, 72, 104));
+            let peak = vec![Pos2::new(c.x, rect.top() + h * 0.14), Pos2::new(rect.right() - w * 0.18, rect.bottom() - h * 0.14), Pos2::new(rect.left() + w * 0.18, rect.bottom() - h * 0.14)];
+            painter.add(egui::Shape::convex_polygon(peak, silver, Stroke::NONE));
+            draw_diamond(painter, Pos2::new(c.x, c.y + h * 0.08), w * 0.09, h * 0.16, gold);
+        }
+        ForeignPowerId::VesperaEmpire => {
+            // Grand Duchy of Vespera: Midnight Velvet & Rose-Gold Crest
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(48, 22, 68));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left() + w * 0.38, rect.top()), Vec2::new(w * 0.24, h)), CornerRadius::ZERO, Color32::from_rgb(196, 134, 86));
+            draw_compass_star(painter, c, h * 0.26, silver);
+        }
+        ForeignPowerId::KharosDesertLeague => {
+            // Kharos Oasis: Warm Sand-Gold & Oasis Cyan Geometric Band
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(206, 158, 62));
+            let chev = vec![rect.right_top(), Pos2::new(c.x, c.y), rect.right_bottom()];
+            painter.add(egui::Shape::convex_polygon(chev, Color32::from_rgb(18, 132, 148), Stroke::NONE));
+            draw_hex(painter, Pos2::new(rect.left() + w * 0.32, c.y), h * 0.22, Color32::from_rgb(38, 44, 62));
+        }
+        ForeignPowerId::CaledonArchipelago => {
+            // Caledon: Deep Marine & Jade Quartered Banner
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(18, 92, 138));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(c.x, rect.top()), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(34, 158, 126));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(34, 158, 126));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(c.x, c.y), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), Color32::from_rgb(18, 92, 138));
+            draw_diamond(painter, c, w * 0.14, h * 0.22, gold);
+        }
+        ForeignPowerId::DrakoriaState => {
+            // Iron Republic of Drakoria: Obsidian & Crimson Iron Chevron + Amber Hex
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(26, 28, 36));
+            let chev = vec![rect.left_top(), Pos2::new(rect.left() + w * 0.48, c.y), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(chev, Color32::from_rgb(172, 24, 38), Stroke::NONE));
+            draw_hex(painter, Pos2::new(c.x + w * 0.16, c.y), h * 0.23, Color32::from_rgb(245, 158, 11));
+        }
+        ForeignPowerId::LuminaRepublic => {
+            // Commonwealth of Lumina: Bright Mint-Teal & Royal Indigo + Radiant Star
+            painter.rect_filled(rect, CornerRadius::same(2), Color32::from_rgb(26, 168, 152));
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.34, h)), CornerRadius::same(1), Color32::from_rgb(42, 48, 118));
+            draw_compass_star(painter, Pos2::new(rect.left() + w * 0.64, c.y), h * 0.28, silver);
+        }
+        ForeignPowerId::OakhavenUnion => {
+            // Oakhaven Heartland: Deep Forest & Harvest Gold + Copper Diamond
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.58)), CornerRadius::same(1), Color32::from_rgb(32, 108, 62));
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.top() + h * 0.58), Vec2::new(w, h * 0.42)), CornerRadius::same(1), Color32::from_rgb(212, 162, 42));
+            draw_diamond(painter, Pos2::new(c.x, rect.top() + h * 0.42), w * 0.16, h * 0.26, silver);
+        }
+        ForeignPowerId::Emergent(n) => {
+            let palettes: [(Color32, Color32, Color32); 6] = [
+                (Color32::from_rgb(22, 130, 120), Color32::from_rgb(236, 242, 248), gold),
+                (Color32::from_rgb(124, 52, 28), gold, Color32::from_rgb(26, 30, 42)),
+                (Color32::from_rgb(67, 56, 202), silver, Color32::from_rgb(16, 185, 129)),
+                (Color32::from_rgb(156, 32, 54), Color32::from_rgb(24, 28, 36), Color32::from_rgb(245, 158, 11)),
+                (Color32::from_rgb(15, 118, 110), Color32::from_rgb(244, 206, 72), Color32::from_rgb(30, 58, 138)),
+                (Color32::from_rgb(109, 40, 217), silver, Color32::from_rgb(239, 68, 68)),
+            ];
+            let (c1, c2, c3) = if power.is_rebel_state {
+                (Color32::from_rgb(153, 27, 27), Color32::from_rgb(18, 20, 26), Color32::from_rgb(245, 158, 11))
+            } else {
+                palettes[((power.flag_seed as usize) + (n as usize)) % palettes.len()]
+            };
+            painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.5)), CornerRadius::same(1), c1);
+            painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.5)), CornerRadius::same(1), c2);
+            let chevron = vec![rect.left_top(), Pos2::new(rect.left() + w * 0.40, c.y), rect.left_bottom()];
+            painter.add(egui::Shape::convex_polygon(chevron, c3, Stroke::NONE));
+            draw_compass_star(painter, Pos2::new(c.x + w * 0.14, c.y), h * 0.22, if power.is_rebel_state { Color32::from_rgb(239, 68, 68) } else { c3 });
         }
     }
 
     if power.annexed {
-        // Conquest dark veil + golden diagonal ribbon
         painter.rect_filled(
             rect,
             CornerRadius::same(2),
-            Color32::from_rgba_unmultiplied(10, 18, 28, 120),
+            Color32::from_rgba_unmultiplied(10, 18, 28, 125),
         );
         painter.line_segment(
             [rect.left_bottom(), rect.right_top()],
-            Stroke::new(2.5_f32, ACCENT_GOLD),
+            Stroke::new(2.5_f32, gold),
         );
-        draw_star_5(painter, c, h * 0.24, ACCENT_GOLD);
+        draw_compass_star(painter, c, h * 0.25, gold);
     } else if power.puppet_state {
-        // Purple/gold client-state corner mark
         let badge_c = Pos2::new(rect.right() - w * 0.16, rect.top() + h * 0.24);
-        painter.circle_filled(badge_c, h * 0.15, ACCENT_PURPLE);
-        painter.circle_stroke(badge_c, h * 0.15, Stroke::new(1.0_f32, ACCENT_GOLD));
+        painter.circle_filled(badge_c, h * 0.15, accent_purple());
+        painter.circle_stroke(badge_c, h * 0.15, Stroke::new(1.0_f32, gold));
     }
 
     paint_flag_finish(painter, rect, power.annexed || power.puppet_state);
@@ -735,15 +884,15 @@ pub fn draw_world_theater_map(
     let mut clicked_power: Option<ForeignPowerId> = None;
 
     hero_card_frame(if state.flags.ledger_rebalance || state.is_global_hegemon() {
-        BORDER_GOLD
+        border_gold()
     } else {
-        BORDER_SUBTLE
+        border_subtle()
     })
     .show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             ui.label(
-                RichText::new("🌍 STRATEGIC GEOPOLITICAL THEATER MAP")
-                    .color(ACCENT_GOLD)
+                RichText::new("🌍 STRATEGIC WORLD THEATER CHART")
+                    .color(accent_gold())
                     .size(metrics.fs(13.5))
                     .strong(),
             );
@@ -751,36 +900,48 @@ pub fn draw_world_theater_map(
                 badge_scaled(
                     ui,
                     &format!(
-                        "EMPIRE: {} ANNEXED • {} CLIENT",
+                        "EMPIRE: {} ANNEXED • {} CLIENT • {} NATIONS",
                         state.annexed_count(),
-                        state.puppet_count()
+                        state.puppet_count(),
+                        state.foreign_powers.len()
                     ),
-                    if state.annexed_count() > 0 { ACCENT_GOLD } else { ACCENT_BLUE },
-                    metrics.fs(10.5),
+                    if state.annexed_count() > 0 { accent_gold() } else { accent_blue() },
+                    metrics.fs(10.2),
                 );
                 if state.active_wars_count() > 0 {
                     badge_scaled(
                         ui,
                         &format!("⚔ {} ACTIVE WAR(S)", state.active_wars_count()),
-                        ACCENT_RED,
-                        metrics.fs(10.5),
+                        accent_red(),
+                        metrics.fs(10.2),
                     );
                 }
             });
         });
         ui.add_space(6.0);
 
-        let avail_w = ui.available_width().max(320.0);
-        let map_h = (avail_w * 0.29).clamp(205.0, 320.0);
+        let avail_w = ui.available_width().max(360.0);
+        let total_nodes = state.foreign_powers.len().max(1);
+        let map_h = (avail_w * if total_nodes > 12 { 0.42 } else { 0.34 }).clamp(290.0, 460.0);
         let (rect, response) =
             ui.allocate_exact_size(Vec2::new(avail_w, map_h), egui::Sense::click());
         let p = ui.painter();
 
-        // Tactical ocean/grid canvas
-        p.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(9, 15, 25));
-        let grid_col = Color32::from_rgba_unmultiplied(56, 189, 248, 18);
-        let cols = 10;
-        let rows = 5;
+        // Map background adapts to Dark (Tactical Radar) vs Light (Parchment Nautical Chart)
+        let map_bg = if is_dark_mode() {
+            Color32::from_rgb(9, 15, 25)
+        } else {
+            Color32::from_rgb(228, 222, 206)
+        };
+        let grid_col = if is_dark_mode() {
+            Color32::from_rgba_unmultiplied(56, 189, 248, 20)
+        } else {
+            Color32::from_rgba_unmultiplied(120, 102, 74, 34)
+        };
+        p.rect_filled(rect, CornerRadius::same(8), map_bg);
+
+        let cols = 12;
+        let rows = 6;
         for i in 1..cols {
             let x = rect.left() + rect.width() * (i as f32 / cols as f32);
             p.line_segment(
@@ -796,90 +957,95 @@ pub fn draw_world_theater_map(
             );
         }
 
-        // Radar range rings centered on player's sovereign capital
-        let center = Pos2::new(rect.left() + rect.width() * 0.50, rect.top() + rect.height() * 0.52);
-        let base_r = (map_h * 0.22).clamp(36.0, 68.0);
-        p.circle_stroke(
-            center,
-            base_r * 1.45,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(56, 189, 248, 30)),
-        );
-        p.circle_stroke(
-            center,
-            base_r * 2.25,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(56, 189, 248, 20)),
-        );
+        let center = Pos2::new(rect.left() + rect.width() * 0.50, rect.top() + rect.height() * 0.50);
+        let base_r = (map_h * 0.145).clamp(28.0, 52.0);
+        p.circle_stroke(center, base_r * 1.9, Stroke::new(1.0_f32, grid_col));
+        p.circle_stroke(center, base_r * 3.1, Stroke::new(1.0_f32, grid_col));
 
-        // Positions for each foreign power (normalized inside map rect)
-        let node_pos = |id: ForeignPowerId| -> Pos2 {
-            let (nx, ny) = match id {
-                ForeignPowerId::AtlanticRepublic => (0.14, 0.30),
-                ForeignPowerId::PeoplesUnion => (0.86, 0.28),
-                ForeignPowerId::EurasianFederation => (0.76, 0.76),
-                ForeignPowerId::CrescentCoalition => (0.22, 0.78),
-                ForeignPowerId::BorderlandRepublic => (0.50, 0.17),
-                ForeignPowerId::GlobalMonetaryCouncil => (0.50, 0.86),
-            };
-            Pos2::new(rect.left() + rect.width() * nx, rect.top() + rect.height() * ny)
+        // Dual-Ring Layout: Inner Ring (first 6) + Outer Ring (remaining 12+) so 18+ nations never overlap!
+        let inner_count = total_nodes.min(6);
+        let outer_count = total_nodes.saturating_sub(inner_count);
+        let inner_rx = (rect.width() * 0.255).max(95.0);
+        let inner_ry = (rect.height() * 0.255).max(62.0);
+        let outer_rx = (rect.width() * 0.435).max(145.0);
+        let outer_ry = (rect.height() * 0.425).max(104.0);
+
+        let node_pos_idx = |idx: usize| -> Pos2 {
+            if idx < inner_count {
+                let angle = -std::f32::consts::FRAC_PI_2
+                    + (idx as f32 / inner_count.max(1) as f32) * std::f32::consts::TAU;
+                Pos2::new(center.x + inner_rx * angle.cos(), center.y + inner_ry * angle.sin())
+            } else {
+                let oidx = idx - inner_count;
+                let stagger = std::f32::consts::PI / outer_count.max(1) as f32;
+                let angle = -std::f32::consts::FRAC_PI_2
+                    + stagger
+                    + (oidx as f32 / outer_count.max(1) as f32) * std::f32::consts::TAU;
+                Pos2::new(center.x + outer_rx * angle.cos(), center.y + outer_ry * angle.sin())
+            }
         };
 
-        let flag_h = (map_h * 0.105).clamp(18.0, 29.0);
+        let flag_h = (map_h * 0.056).clamp(14.0, 22.0);
         let flag_w = flag_h * 1.55;
 
-        // Draw connecting strategic lanes first
-        for fp in &state.foreign_powers {
-            let target_pos = node_pos(fp.id);
+        // Draw connecting lanes
+        for (idx, fp) in state.foreign_powers.iter().enumerate() {
+            let target_pos = node_pos_idx(idx);
             let (line_col, width): (Color32, f32) = if fp.annexed {
-                (Color32::from_rgba_unmultiplied(250, 204, 21, 185), 2.4)
+                (Color32::from_rgba_unmultiplied(234, 179, 8, 175), 2.0)
             } else if fp.at_war {
-                (ACCENT_RED, 2.8)
+                (accent_red(), 2.5)
             } else if fp.puppet_state {
-                (ACCENT_PURPLE, 2.2)
+                (accent_purple(), 1.9)
             } else if fp.defense_alliance {
-                (ACCENT_GREEN, 2.0)
+                (accent_green(), 1.7)
             } else if fp.trade_pact {
-                (ACCENT_BLUE, 1.6)
-            } else if fp.sanctioning_us || fp.we_sanction_them {
-                (Color32::from_rgba_unmultiplied(245, 158, 11, 120), 1.3)
+                (accent_blue(), 1.4)
             } else {
-                (Color32::from_rgba_unmultiplied(120, 145, 175, 55), 1.0)
+                (
+                    if is_dark_mode() {
+                        Color32::from_rgba_unmultiplied(120, 145, 175, 42)
+                    } else {
+                        Color32::from_rgba_unmultiplied(110, 96, 76, 52)
+                    },
+                    0.85,
+                )
             };
             p.line_segment([center, target_pos], Stroke::new(width, line_col));
 
-            // Midpoint battle/status indicator
             if fp.at_war && !fp.annexed {
                 let mid = Pos2::new((center.x + target_pos.x) * 0.5, (center.y + target_pos.y) * 0.5);
-                p.circle_filled(mid, 10.0, Color32::from_rgb(127, 29, 29));
-                p.circle_stroke(mid, 10.0, Stroke::new(1.2_f32, ACCENT_RED));
+                p.circle_filled(mid, 9.5, Color32::from_rgb(138, 24, 28));
+                p.circle_stroke(mid, 9.5, Stroke::new(1.2_f32, accent_red()));
                 p.text(
                     mid,
                     egui::Align2::CENTER_CENTER,
                     format!("{:+.0}", fp.war_score),
-                    FontId::proportional((9.5 * metrics.scale).clamp(8.5, 11.5)),
-                    TEXT_PRIMARY,
+                    FontId::proportional(8.8),
+                    Color32::WHITE,
                 );
             }
         }
 
-        // Draw player's Sovereign Nation hub at center
-        let empire_growth = 1.0 + (state.annexed_count() as f32) * 0.12;
-        let hub_r = (base_r * 0.85 * empire_growth).min(map_h * 0.34);
-        let hub_fill = if state.flags.ledger_rebalance || state.is_global_hegemon() {
-            Color32::from_rgba_unmultiplied(250, 204, 21, 30)
-        } else {
-            Color32::from_rgba_unmultiplied(56, 189, 248, 28)
-        };
+        // Player Sovereign Capital Hub at center
+        let hub_r = (base_r * 0.92).min(map_h * 0.18);
         let hub_stroke = if state.flags.ledger_rebalance || state.is_global_hegemon() {
-            ACCENT_GOLD
+            accent_gold()
         } else {
-            ACCENT_BLUE
+            accent_blue()
         };
+        let hub_fill = Color32::from_rgba_unmultiplied(
+            hub_stroke.r(),
+            hub_stroke.g(),
+            hub_stroke.b(),
+            if is_dark_mode() { 34 } else { 42 },
+        );
         p.circle_filled(center, hub_r, hub_fill);
         p.circle_stroke(center, hub_r, Stroke::new(1.8_f32, hub_stroke));
 
         let our_flag_rect = Rect::from_center_size(
-            Pos2::new(center.x, center.y - 7.0),
-            Vec2::new(flag_w * 1.25, flag_h * 1.25),
+            Pos2::new(center.x, center.y - 6.0),
+            Vec2::new(flag_w * 1.4, flag_h * 1.4),
         );
         paint_nation_flag_at(
             p,
@@ -891,14 +1057,13 @@ pub fn draw_world_theater_map(
             state.is_global_hegemon(),
         );
         p.text(
-            Pos2::new(center.x, our_flag_rect.bottom() + 9.0),
+            Pos2::new(center.x, our_flag_rect.bottom() + 8.5),
             egui::Align2::CENTER_CENTER,
             &state.nation_name,
-            FontId::proportional((11.5 * metrics.scale).clamp(10.0, 14.0)),
-            if state.flags.ledger_rebalance { ACCENT_GOLD } else { TEXT_PRIMARY },
+            FontId::proportional((11.0 * metrics.scale).clamp(9.5, 13.5)),
+            if state.flags.ledger_rebalance { accent_gold() } else { text_primary() },
         );
 
-        // Draw each Foreign Power node with drawn flag & click detection
         let hover_pos = ui.input(|i| i.pointer.hover_pos());
         let click_pos = if response.clicked() {
             response.interact_pointer_pos()
@@ -907,33 +1072,36 @@ pub fn draw_world_theater_map(
         };
         let mut tooltip_text: Option<String> = None;
 
-        for fp in &state.foreign_powers {
-            let pos = node_pos(fp.id);
-            let card_w = (flag_w + 78.0 * metrics.scale).clamp(112.0, 186.0);
-            let card_h = (flag_h + 18.0).clamp(36.0, 52.0);
+        for (idx, fp) in state.foreign_powers.iter().enumerate() {
+            let pos = node_pos_idx(idx);
+            let card_w = (flag_w + 62.0 * metrics.scale).clamp(88.0, 146.0);
+            let card_h = (flag_h + 13.0).clamp(28.0, 39.0);
             let node_rect = Rect::from_center_size(pos, Vec2::new(card_w, card_h));
             let hovered = hover_pos.map(|hp| node_rect.contains(hp)).unwrap_or(false);
 
             let border_col = if fp.annexed {
-                ACCENT_GOLD
-            } else if fp.at_war {
-                ACCENT_RED
+                accent_gold()
+            } else if fp.at_war || fp.is_rebel_state {
+                accent_red()
             } else if fp.puppet_state {
-                ACCENT_PURPLE
+                accent_purple()
             } else if hovered {
-                ACCENT_CYAN
+                accent_cyan()
             } else {
-                BORDER_SUBTLE
+                border_subtle()
             };
-            p.rect_filled(
-                node_rect,
-                CornerRadius::same(6),
-                if hovered {
-                    Color32::from_rgb(30, 44, 66)
+            let node_bg = if hovered {
+                if is_dark_mode() {
+                    Color32::from_rgb(32, 46, 68)
                 } else {
-                    Color32::from_rgba_unmultiplied(17, 25, 39, 235)
-                },
-            );
+                    Color32::from_rgb(255, 252, 244)
+                }
+            } else if is_dark_mode() {
+                Color32::from_rgba_unmultiplied(18, 26, 40, 240)
+            } else {
+                Color32::from_rgba_unmultiplied(250, 247, 238, 242)
+            };
+            p.rect_filled(node_rect, CornerRadius::same(6), node_bg);
             p.rect_stroke(
                 node_rect,
                 CornerRadius::same(6),
@@ -942,35 +1110,37 @@ pub fn draw_world_theater_map(
             );
 
             let f_rect = Rect::from_min_size(
-                Pos2::new(node_rect.left() + 6.0, node_rect.center().y - flag_h * 0.5),
+                Pos2::new(node_rect.left() + 4.5, node_rect.center().y - flag_h * 0.5),
                 Vec2::new(flag_w, flag_h),
             );
             paint_foreign_flag_at(p, f_rect, fp);
 
-            let text_x = f_rect.right() + 6.0;
+            let text_x = f_rect.right() + 4.5;
             p.text(
-                Pos2::new(text_x, node_rect.center().y - 6.5),
+                Pos2::new(text_x, node_rect.center().y - 5.0),
                 egui::Align2::LEFT_CENTER,
                 &fp.short_name,
-                FontId::proportional((10.5 * metrics.scale).clamp(9.5, 13.0)),
-                TEXT_PRIMARY,
+                FontId::proportional((9.2 * metrics.scale).clamp(8.2, 11.4)),
+                text_primary(),
             );
             let (sub_txt, sub_col) = if fp.annexed {
-                ("★ ANNEXED".to_string(), ACCENT_GOLD)
+                ("★ ANNEXED".to_string(), accent_gold())
+            } else if fp.is_rebel_state && fp.at_war {
+                (format!("🔥 {:+.0}", fp.war_score), accent_red())
             } else if fp.at_war {
-                (format!("⚔ WAR {:+.0}", fp.war_score), ACCENT_RED)
+                (format!("⚔ {:+.0}", fp.war_score), accent_red())
             } else if fp.puppet_state {
-                ("👑 CLIENT".to_string(), ACCENT_PURPLE)
+                ("👑 CLIENT".to_string(), accent_purple())
             } else if fp.defense_alliance {
-                (format!("🛡 ALLY {:+.0}", fp.relation), ACCENT_GREEN)
+                (format!("🛡 {:+.0}", fp.relation), accent_green())
             } else {
-                (format!("Rel {:+.0}", fp.relation), severity_color(fp.relation + 50.0, true))
+                (format!("{:+.0}", fp.relation), severity_color(fp.relation + 50.0, true))
             };
             p.text(
-                Pos2::new(text_x, node_rect.center().y + 7.5),
+                Pos2::new(text_x, node_rect.center().y + 6.0),
                 egui::Align2::LEFT_CENTER,
                 sub_txt,
-                FontId::proportional((9.5 * metrics.scale).clamp(8.5, 11.5)),
+                FontId::proportional((8.4 * metrics.scale).clamp(7.8, 10.5)),
                 sub_col,
             );
 
@@ -1005,7 +1175,7 @@ pub fn draw_world_theater_map(
         p.rect_stroke(
             rect,
             CornerRadius::same(8),
-            Stroke::new(1.0_f32, BORDER_SUBTLE),
+            Stroke::new(1.0_f32, border_subtle()),
             egui::StrokeKind::Inside,
         );
 
@@ -1017,6 +1187,20 @@ pub fn draw_world_theater_map(
     clicked_power
 }
 
+pub fn compute_era_label(state: &NationState) -> &'static str {
+    if state.is_global_hegemon() || state.flags.ledger_rebalance {
+        "GOLDEN HEGEMONY ERA"
+    } else if state.programs.space_tier >= 2 || state.programs.fighter_jet_tier >= 3 {
+        "ORBITAL HYPER-AGE"
+    } else if state.nuclear_status.stage() >= 3 {
+        "ATOMIC DETERRENCE ERA"
+    } else if state.gdp_bn >= 1000.0 {
+        "SUPERPOWER ERA"
+    } else {
+        "SOVEREIGN DAWN ERA"
+    }
+}
+
 pub fn compute_sovereign_power_score(state: &NationState) -> (f64, &'static str, Color32) {
     let score = (state.gdp_bn / 18.0).min(1200.0)
         + state.active_troops_k * 0.25
@@ -1024,85 +1208,41 @@ pub fn compute_sovereign_power_score(state: &NationState) -> (f64, &'static str,
         + state.tech_level * 1.2
         + state.stability * 1.1
         + (state.nuclear_status.stage() as f64) * 55.0
+        + (state.armed_forces.army_divisions as f64) * 2.0
+        + (state.armed_forces.fighter_squadrons as f64) * 3.0
+        + (state.armed_forces.destroyers as f64) * 2.5
         + (state.annexed_count() as f64) * 180.0
         + (state.puppet_count() as f64) * 110.0;
 
     if state.is_global_hegemon() {
-        (score, "GLOBAL HEGEMON", ACCENT_GOLD)
+        (score, "GLOBAL HEGEMON", accent_gold())
     } else if score >= 1400.0 {
-        (score, "HYPERPOWER", ACCENT_GOLD)
+        (score, "HYPERPOWER", accent_gold())
     } else if score >= 900.0 {
-        (score, "SUPERPOWER", ACCENT_PURPLE)
+        (score, "SUPERPOWER", accent_purple())
     } else if score >= 520.0 {
-        (score, "GREAT POWER", ACCENT_BLUE)
+        (score, "GREAT POWER", accent_blue())
     } else if score >= 300.0 {
-        (score, "REGIONAL POWER", ACCENT_GREEN)
+        (score, "REGIONAL POWER", accent_green())
     } else {
-        (score, "EMERGING STATE", ACCENT_AMBER)
+        (score, "EMERGING STATE", accent_amber())
     }
 }
 
-pub fn compute_achievements(state: &NationState) -> Vec<(&'static str, &'static str, &'static str, bool, Color32)> {
+pub fn compute_achievements(
+    state: &NationState,
+) -> Vec<(&'static str, &'static str, &'static str, bool, Color32)> {
     vec![
-        (
-            "🏆",
-            "Trillionaire",
-            "Reach $1.00T Nominal GDP",
-            state.gdp_bn >= 1000.0,
-            ACCENT_GREEN,
-        ),
-        (
-            "💎",
-            "Debt-Free",
-            "Eliminate all sovereign national debt",
-            state.national_debt_bn <= 0.1,
-            ACCENT_CYAN,
-        ),
-        (
-            "☢",
-            "Atomic Triad",
-            "Complete Strategic ICBM Triad",
-            state.nuclear_status == NuclearStatus::StrategicTriad,
-            ACCENT_AMBER,
-        ),
-        (
-            "⚔",
-            "Conqueror",
-            "Annex at least 1 rival country after war",
-            state.annexed_count() >= 1,
-            ACCENT_RED,
-        ),
-        (
-            "👑",
-            "Global Hegemon",
-            "Annex or vassalize all 5 rival powers",
-            state.is_global_hegemon(),
-            ACCENT_GOLD,
-        ),
-        (
-            "🕊",
-            "Tax-Free Haven",
-            "Operate with 0% national taxes",
-            state.taxes.income_tax <= 0.01
-                && state.taxes.corporate_tax <= 0.01
-                && state.taxes.tariffs <= 0.01
-                && state.taxes.wealth_tax <= 0.01,
-            ACCENT_BLUE,
-        ),
-        (
-            "🛡",
-            "Iron Mandate",
-            "Maintain 85%+ Stability & 0% Coup Risk",
-            state.stability >= 85.0 && state.coup_risk <= 1.0,
-            ACCENT_PURPLE,
-        ),
-        (
-            "⭐",
-            "Golden Era",
-            "Unlock the Sovereign Golden Mandate",
-            state.flags.ledger_rebalance,
-            ACCENT_GOLD,
-        ),
+        ("🏆", "Trillionaire", "Reach $1.00T Nominal GDP", state.gdp_bn >= 1000.0, accent_green()),
+        ("💎", "Debt-Free", "Eliminate all sovereign national debt", state.national_debt_bn <= 0.1, accent_cyan()),
+        ("☢", "Atomic Triad", "Complete Strategic ICBM Triad", state.nuclear_status == NuclearStatus::StrategicTriad, accent_amber()),
+        ("⚔", "Conqueror", "Annex at least 1 rival country after war", state.annexed_count() >= 1, accent_red()),
+        ("👑", "Global Hegemon", "Annex or vassalize all rival world powers", state.is_global_hegemon(), accent_gold()),
+        ("✈", "Sky Sovereign", "Develop a 5th-Gen+ Indigenous Stealth Fighter Jet", state.programs.fighter_jet_tier >= 2, accent_cyan()),
+        ("💥", "Atomic Tester", "Conduct a live nuclear weapons test", state.programs.nuke_tests_conducted >= 1, accent_red()),
+        ("💰", "Arms Titan", "Sell $50B+ in defense weapons exports", state.armed_forces.total_arms_sales_bn >= 50.0, accent_green()),
+        ("🔥", "Kingmaker", "Split a rival nation to form a brand-new country", state.foreign_powers.iter().any(|p| matches!(p.id, ForeignPowerId::Emergent(_)) && !p.is_rebel_state), accent_amber()),
+        ("⭐", "Golden Era", "Unlock the Sovereign Golden Mandate", state.flags.ledger_rebalance, accent_gold()),
     ]
 }
 
@@ -1123,14 +1263,14 @@ pub fn sparkline_card(
         let delta = latest - prev;
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new(title).color(TEXT_MUTED).size(11.5).strong());
+            ui.label(RichText::new(title).color(text_muted()).size(11.5).strong());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(
-                    RichText::new(format!("{:.1}{} ({:+.1})", latest, unit_suffix, delta))
-                        .color(color)
-                        .size(12.0)
-                        .strong(),
-                );
+                let val_str = if unit_suffix == "B" {
+                    format!("{} ({})", fmt_billions(latest), fmt_signed_billions(delta))
+                } else {
+                    format!("{:.1}{} ({:+.1})", latest, unit_suffix, delta)
+                };
+                ui.label(RichText::new(val_str).color(color).size(12.0).strong());
             });
         });
         ui.add_space(6.0);
@@ -1140,13 +1280,17 @@ pub fn sparkline_card(
         let (rect, _) = ui.allocate_exact_size(Vec2::new(width, height), egui::Sense::hover());
         let painter = ui.painter();
 
-        // Subtle chart frame & grid lines
-        painter.rect_filled(rect, CornerRadius::same(5), BG_CANVAS);
+        painter.rect_filled(rect, CornerRadius::same(5), bg_inset());
+        let grid_line = if is_dark_mode() {
+            Color32::from_rgb(28, 38, 56)
+        } else {
+            Color32::from_rgb(206, 200, 186)
+        };
         for i in 1..4 {
             let y = rect.top() + rect.height() * (i as f32 / 4.0);
             painter.line_segment(
                 [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-                Stroke::new(0.6_f32, Color32::from_rgb(28, 38, 56)),
+                Stroke::new(0.6_f32, grid_line),
             );
         }
 

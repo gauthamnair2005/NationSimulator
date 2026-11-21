@@ -212,7 +212,7 @@ pub fn all_decisions() -> Vec<DecisionDef> {
 }
 
 pub fn can_enact(state: &NationState, def: &DecisionDef) -> Result<(), String> {
-    if state.political_capital < def.political_cost {
+    if !state.has_pc(def.political_cost) {
         return Err(format!("Need {:.0} Political Capital", def.political_cost));
     }
     if state.treasury_bn < def.treasury_cost_bn {
@@ -240,7 +240,7 @@ pub fn enact_decision(state: &mut NationState, id: &str) -> Result<String, Strin
         .ok_or_else(|| "Unknown decision".to_string())?;
     can_enact(state, def)?;
 
-    state.political_capital = (state.political_capital - def.political_cost).max(0.0);
+    state.spend_pc(def.political_cost);
     state.treasury_bn -= def.treasury_cost_bn;
 
     if let Some(cd) = def.repeatable_cooldown {
