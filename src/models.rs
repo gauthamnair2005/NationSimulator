@@ -260,6 +260,7 @@ pub enum ForeignPowerId {
     DrakoriaState,
     LuminaRepublic,
     OakhavenUnion,
+    WorldState(u32),
     Emergent(u32),
 }
 
@@ -290,11 +291,21 @@ pub struct ForeignPower {
     pub parent_origin: Option<String>,
     #[serde(default)]
     pub flag_seed: u8,
+    #[serde(default)]
+    pub lat: f32,
+    #[serde(default)]
+    pub lon: f32,
+    #[serde(default)]
+    pub region: String,
 }
 
 impl ForeignPower {
     pub fn is_conquerable(&self) -> bool {
         self.id != ForeignPowerId::GlobalMonetaryCouncil && !self.annexed
+    }
+
+    pub fn is_major_power(&self) -> bool {
+        !matches!(self.id, ForeignPowerId::WorldState(_))
     }
 }
 
@@ -934,10 +945,17 @@ impl NationState {
                 }
                 _ => {}
             }
+            if fp.region.is_empty() {
+                let (lat, lon, reg) = crate::world_gen::core_power_geo(fp.id);
+                fp.lat = lat;
+                fp.lon = lon;
+                fp.region = reg.to_string();
+            }
         }
-        let extras = Self::expanded_world_powers();
-        for fp in extras {
-            if !self.foreign_powers.iter().any(|existing| existing.id == fp.id) {
+        let existing_ids: std::collections::HashSet<ForeignPowerId> =
+            self.foreign_powers.iter().map(|p| p.id).collect();
+        for fp in Self::expanded_world_powers() {
+            if !existing_ids.contains(&fp.id) {
                 self.foreign_powers.push(fp);
             }
         }
@@ -1526,6 +1544,9 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
             ForeignPower {
                 id: ForeignPowerId::PeoplesUnion,
@@ -1548,6 +1569,9 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
             ForeignPower {
                 id: ForeignPowerId::EurasianFederation,
@@ -1570,6 +1594,9 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
             ForeignPower {
                 id: ForeignPowerId::CrescentCoalition,
@@ -1592,6 +1619,9 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
             ForeignPower {
                 id: ForeignPowerId::BorderlandRepublic,
@@ -1614,6 +1644,9 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
             ForeignPower {
                 id: ForeignPowerId::GlobalMonetaryCouncil,
@@ -1636,9 +1669,20 @@ impl NationState {
                 is_rebel_state: false,
                 parent_origin: None,
                 flag_seed: 0,
+                lat: 0.0,
+                lon: 0.0,
+                region: String::new(),
             },
         ];
         foreign_powers.extend(Self::expanded_world_powers());
+        for fp in &mut foreign_powers {
+            if fp.region.is_empty() {
+                let (lat, lon, reg) = crate::world_gen::core_power_geo(fp.id);
+                fp.lat = lat;
+                fp.lon = lon;
+                fp.region = reg.to_string();
+            }
+        }
 
         Self {
             nation_name: "Republic of Aurelia".into(),
@@ -1731,29 +1775,35 @@ impl NationState {
     }
 
     pub fn expanded_world_powers() -> Vec<ForeignPower> {
-        let make = |id, name: &str, short: &str, ideo: &str, mil, econ, rel, seed| ForeignPower {
-            id,
-            name: name.into(),
-            short_name: short.into(),
-            ideology: ideo.into(),
-            military_power: mil,
-            economic_power: econ,
-            relation: rel,
-            trade_pact: false,
-            defense_alliance: false,
-            sanctioning_us: false,
-            we_sanction_them: false,
-            at_war: false,
-            war_score: 0.0,
-            proxy_funding: false,
-            spy_network: false,
-            annexed: false,
-            puppet_state: false,
-            is_rebel_state: false,
-            parent_origin: None,
-            flag_seed: seed,
+        let make = |id, name: &str, short: &str, ideo: &str, mil, econ, rel, seed| {
+            let (lat, lon, reg) = crate::world_gen::core_power_geo(id);
+            ForeignPower {
+                id,
+                name: name.into(),
+                short_name: short.into(),
+                ideology: ideo.into(),
+                military_power: mil,
+                economic_power: econ,
+                relation: rel,
+                trade_pact: false,
+                defense_alliance: false,
+                sanctioning_us: false,
+                we_sanction_them: false,
+                at_war: false,
+                war_score: 0.0,
+                proxy_funding: false,
+                spy_network: false,
+                annexed: false,
+                puppet_state: false,
+                is_rebel_state: false,
+                parent_origin: None,
+                flag_seed: seed,
+                lat,
+                lon,
+                region: reg.to_string(),
+            }
         };
-        vec![
+        let mut all = vec![
             make(ForeignPowerId::BharatUnion, "Indravarta Technate", "Indravarta", "Federal Technocracy / Space & Robotics", 82.0, 84.0, 16.0, 1),
             make(ForeignPowerId::NordicConfederation, "Valheim Frost League", "Valheim", "Social Democracy / Green High-Tech", 58.0, 82.0, 20.0, 2),
             make(ForeignPowerId::PacificSyndicate, "Thalassia Maritime Syndicate", "Thalassia", "Maritime Capitalism / Chip & Naval Hub", 72.0, 89.0, 14.0, 3),
@@ -1766,6 +1816,8 @@ impl NationState {
             make(ForeignPowerId::DrakoriaState, "Iron Republic of Drakoria", "Drakoria", "Militarized Industrial Autocracy", 88.0, 70.0, -18.0, 10),
             make(ForeignPowerId::LuminaRepublic, "Commonwealth of Lumina", "Lumina", "Eco-Futurist Research Republic", 66.0, 91.0, 22.0, 11),
             make(ForeignPowerId::OakhavenUnion, "Oakhaven Heartland Federation", "Oakhaven", "Agrarian-Industrial Republic", 55.0, 64.0, 12.0, 12),
-        ]
+        ];
+        all.extend(crate::world_gen::generate_160_fictional_countries());
+        all
     }
 }

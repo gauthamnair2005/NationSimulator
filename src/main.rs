@@ -3,6 +3,7 @@ mod events;
 mod models;
 mod simulation;
 mod ui;
+mod world_gen;
 
 use eframe::egui;
 use ui::NationSimApp;

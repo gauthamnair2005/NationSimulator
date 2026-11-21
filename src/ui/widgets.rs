@@ -834,6 +834,97 @@ pub fn paint_foreign_flag_at(painter: &egui::Painter, rect: Rect, power: &Foreig
             painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.top() + h * 0.58), Vec2::new(w, h * 0.42)), CornerRadius::same(1), Color32::from_rgb(212, 162, 42));
             draw_diamond(painter, Pos2::new(c.x, rect.top() + h * 0.42), w * 0.16, h * 0.26, silver);
         }
+        ForeignPowerId::WorldState(n) => {
+            // 100% Original Fictional Procedural Heraldry (8 geometric patterns x 12 palettes, zero real-world flags)
+            let palettes: [(Color32, Color32, Color32); 12] = [
+                (Color32::from_rgb(18, 92, 134), Color32::from_rgb(208, 134, 42), silver),
+                (Color32::from_rgb(76, 36, 128), Color32::from_rgb(26, 148, 142), gold),
+                (Color32::from_rgb(32, 62, 92), Color32::from_rgb(184, 72, 66), gold),
+                (Color32::from_rgb(22, 112, 88), Color32::from_rgb(44, 48, 72), Color32::from_rgb(242, 198, 76)),
+                (Color32::from_rgb(128, 42, 74), Color32::from_rgb(28, 38, 62), silver),
+                (Color32::from_rgb(156, 86, 32), Color32::from_rgb(24, 86, 108), Color32::from_rgb(244, 234, 206)),
+                (Color32::from_rgb(38, 46, 84), Color32::from_rgb(188, 144, 52), Color32::from_rgb(64, 196, 186)),
+                (Color32::from_rgb(92, 46, 36), Color32::from_rgb(36, 116, 112), gold),
+                (Color32::from_rgb(24, 82, 116), Color32::from_rgb(142, 58, 122), silver),
+                (Color32::from_rgb(46, 88, 62), Color32::from_rgb(198, 116, 54), silver),
+                (Color32::from_rgb(56, 32, 86), Color32::from_rgb(212, 152, 48), Color32::from_rgb(232, 240, 248)),
+                (Color32::from_rgb(22, 72, 96), Color32::from_rgb(196, 84, 74), Color32::from_rgb(245, 212, 98)),
+            ];
+            let seed = (power.flag_seed as usize).wrapping_add((n as usize) * 13);
+            let (c1, c2, c3) = palettes[seed % palettes.len()];
+            let pattern = (seed / 12) % 8;
+            match pattern {
+                0 => {
+                    // Diagonal split + centered hex crest
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    let tri = vec![rect.left_bottom(), rect.right_bottom(), rect.right_top()];
+                    painter.add(egui::Shape::convex_polygon(tri, c2, Stroke::NONE));
+                    draw_hex(painter, c, h * 0.25, c3);
+                }
+                1 => {
+                    // Hoist chevron + diamond emblem
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    let chev = vec![rect.left_top(), Pos2::new(rect.left() + w * 0.44, c.y), rect.left_bottom()];
+                    painter.add(egui::Shape::convex_polygon(chev, c2, Stroke::NONE));
+                    draw_diamond(painter, Pos2::new(c.x + w * 0.14, c.y), w * 0.14, h * 0.26, c3);
+                }
+                2 => {
+                    // Quartered banner + compass star
+                    painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), c1);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(c.x, rect.top()), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), c2);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), c2);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(c.x, c.y), Vec2::new(w * 0.5, h * 0.5)), CornerRadius::same(1), c1);
+                    draw_compass_star(painter, c, h * 0.27, c3);
+                }
+                3 => {
+                    // Twin outer bands + diamond ring
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.20)), CornerRadius::same(1), c2);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), rect.bottom() - h * 0.20), Vec2::new(w, h * 0.20)), CornerRadius::same(1), c2);
+                    draw_diamond(painter, c, w * 0.20, h * 0.28, c3);
+                    painter.circle_filled(c, h * 0.10, c1);
+                }
+                4 => {
+                    // Asymmetric diagonal ribbon + hex
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    let band = vec![
+                        Pos2::new(rect.left() + w * 0.15, rect.top()),
+                        Pos2::new(rect.left() + w * 0.45, rect.top()),
+                        Pos2::new(rect.left() + w * 0.25, rect.bottom()),
+                        rect.left_bottom(),
+                    ];
+                    painter.add(egui::Shape::convex_polygon(band, c2, Stroke::NONE));
+                    draw_compass_star(painter, Pos2::new(c.x + w * 0.16, c.y), h * 0.24, c3);
+                }
+                5 => {
+                    // Concentric heraldic rings + vertical pillar
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left() + w * 0.36, rect.top()), Vec2::new(w * 0.28, h)), CornerRadius::ZERO, c2);
+                    painter.circle_stroke(c, h * 0.28, Stroke::new(1.6_f32, c3));
+                    draw_diamond(painter, c, h * 0.14, h * 0.14, c3);
+                }
+                6 => {
+                    // Twin opposing triangles + hex core
+                    painter.rect_filled(rect, CornerRadius::same(2), c1);
+                    let t1 = vec![rect.left_top(), Pos2::new(c.x, c.y), rect.left_bottom()];
+                    let t2 = vec![rect.right_top(), Pos2::new(c.x, c.y), rect.right_bottom()];
+                    painter.add(egui::Shape::convex_polygon(t1, c2, Stroke::NONE));
+                    painter.add(egui::Shape::convex_polygon(t2, c2, Stroke::NONE));
+                    draw_hex(painter, c, h * 0.22, c3);
+                }
+                _ => {
+                    // Horizontal horizon split + radiant peak
+                    painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, h * 0.52)), CornerRadius::same(1), c1);
+                    painter.rect_filled(Rect::from_min_size(Pos2::new(rect.left(), c.y), Vec2::new(w, h * 0.50)), CornerRadius::same(1), c2);
+                    let peak = vec![
+                        Pos2::new(c.x, rect.top() + h * 0.16),
+                        Pos2::new(c.x + w * 0.22, rect.bottom() - h * 0.16),
+                        Pos2::new(c.x - w * 0.22, rect.bottom() - h * 0.16),
+                    ];
+                    painter.add(egui::Shape::convex_polygon(peak, c3, Stroke::NONE));
+                }
+            }
+        }
         ForeignPowerId::Emergent(n) => {
             let palettes: [(Color32, Color32, Color32); 6] = [
                 (Color32::from_rgb(22, 130, 120), Color32::from_rgb(236, 242, 248), gold),
@@ -876,12 +967,50 @@ pub fn paint_foreign_flag_at(painter: &egui::Painter, rect: Rect, power: &Foreig
     paint_flag_finish(painter, rect, power.annexed || power.puppet_state);
 }
 
-pub fn draw_world_theater_map(
+#[derive(Debug, Clone)]
+pub struct GlobeViewState {
+    pub cam_lon: f32,
+    pub cam_lat: f32,
+    pub auto_spin: bool,
+    pub selected: Option<ForeignPowerId>,
+}
+
+impl Default for GlobeViewState {
+    fn default() -> Self {
+        Self {
+            cam_lon: 12.0,
+            cam_lat: 16.0,
+            auto_spin: true,
+            selected: None,
+        }
+    }
+}
+
+fn project_ortho(
+    lat_deg: f32,
+    lon_deg: f32,
+    cam_lat_deg: f32,
+    cam_lon_deg: f32,
+    center: Pos2,
+    radius: f32,
+) -> (Pos2, f32) {
+    let phi = lat_deg.to_radians();
+    let lam = (lon_deg - cam_lon_deg).to_radians();
+    let phi0 = cam_lat_deg.to_radians();
+    let cos_c = phi0.sin() * phi.sin() + phi0.cos() * phi.cos() * lam.cos();
+    let x = center.x + radius * phi.cos() * lam.sin();
+    let y = center.y - radius * (phi0.cos() * phi.sin() - phi0.sin() * phi.cos() * lam.cos());
+    (Pos2::new(x, y), cos_c)
+}
+
+/// Interactive 3D Rotating Planetary Globe plotting all 178+ Fictional Nations, Continents & War/Empire Arcs!
+pub fn draw_interactive_globe(
     ui: &mut egui::Ui,
     state: &NationState,
+    globe: &mut GlobeViewState,
     metrics: &UiMetrics,
 ) -> Option<ForeignPowerId> {
-    let mut clicked_power: Option<ForeignPowerId> = None;
+    let mut double_clicked_open: Option<ForeignPowerId> = None;
 
     hero_card_frame(if state.flags.ledger_rebalance || state.is_global_hegemon() {
         border_gold()
@@ -889,302 +1018,434 @@ pub fn draw_world_theater_map(
         border_subtle()
     })
     .show(ui, |ui| {
+        // Header + Continent Camera Snap Buttons
         ui.horizontal_wrapped(|ui| {
             ui.label(
-                RichText::new("🌍 STRATEGIC WORLD THEATER CHART")
-                    .color(accent_gold())
-                    .size(metrics.fs(13.5))
-                    .strong(),
+                RichText::new(format!(
+                    "🌍 3D PLANETARY COMMAND GLOBE ({} SOVEREIGN NATIONS)",
+                    state.foreign_powers.len() + 1
+                ))
+                .color(accent_gold())
+                .size(metrics.fs(13.5))
+                .strong(),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                badge_scaled(
-                    ui,
-                    &format!(
-                        "EMPIRE: {} ANNEXED • {} CLIENT • {} NATIONS",
-                        state.annexed_count(),
-                        state.puppet_count(),
-                        state.foreign_powers.len()
-                    ),
-                    if state.annexed_count() > 0 { accent_gold() } else { accent_blue() },
-                    metrics.fs(10.2),
-                );
-                if state.active_wars_count() > 0 {
-                    badge_scaled(
-                        ui,
-                        &format!("⚔ {} ACTIVE WAR(S)", state.active_wars_count()),
-                        accent_red(),
-                        metrics.fs(10.2),
-                    );
+                let spin_lbl = if globe.auto_spin { "⏸ Spin ON" } else { "▶ Spin OFF" };
+                if ui.small_button(spin_lbl).clicked() {
+                    globe.auto_spin = !globe.auto_spin;
+                }
+                for &(reg, tlat, tlon) in &[
+                    ("Thalassia", -24.0_f32, 142.0_f32),
+                    ("Solterra", -20.0, -64.0),
+                    ("Indravara", 28.0, 98.0),
+                    ("Zahara", 2.0, 20.0),
+                    ("Aethelis", 44.0, 10.0),
+                    ("Valdoria", 46.0, -96.0),
+                ] {
+                    if ui.small_button(reg).clicked() {
+                        globe.cam_lat = tlat;
+                        globe.cam_lon = tlon;
+                        globe.auto_spin = false;
+                    }
                 }
             });
         });
         ui.add_space(6.0);
 
-        let avail_w = ui.available_width().max(360.0);
-        let total_nodes = state.foreign_powers.len().max(1);
-        let map_h = (avail_w * if total_nodes > 12 { 0.42 } else { 0.34 }).clamp(290.0, 460.0);
+        let avail_w = ui.available_width().max(340.0);
+        let globe_h = (avail_w * 0.42).clamp(320.0, 490.0);
         let (rect, response) =
-            ui.allocate_exact_size(Vec2::new(avail_w, map_h), egui::Sense::click());
-        let p = ui.painter();
+            ui.allocate_exact_size(Vec2::new(avail_w, globe_h), egui::Sense::click_and_drag());
 
-        // Map background adapts to Dark (Tactical Radar) vs Light (Parchment Nautical Chart)
-        let map_bg = if is_dark_mode() {
-            Color32::from_rgb(9, 15, 25)
+        // Drag directly on the globe to spin in 3D!
+        if response.dragged() {
+            let d = response.drag_delta();
+            globe.cam_lon -= d.x * 0.42;
+            globe.cam_lat = (globe.cam_lat + d.y * 0.32).clamp(-60.0, 60.0);
+            globe.auto_spin = false;
+        }
+        if globe.cam_lon > 180.0 {
+            globe.cam_lon -= 360.0;
+        } else if globe.cam_lon < -180.0 {
+            globe.cam_lon += 360.0;
+        }
+
+        let p = ui.painter_at(rect);
+
+        // Deep Space / Parchment Chart Backdrop
+        let space_bg = if is_dark_mode() {
+            Color32::from_rgb(6, 11, 21)
         } else {
             Color32::from_rgb(228, 222, 206)
         };
-        let grid_col = if is_dark_mode() {
-            Color32::from_rgba_unmultiplied(56, 189, 248, 20)
-        } else {
-            Color32::from_rgba_unmultiplied(120, 102, 74, 34)
-        };
-        p.rect_filled(rect, CornerRadius::same(8), map_bg);
+        p.rect_filled(rect, CornerRadius::same(10), space_bg);
 
-        let cols = 12;
-        let rows = 6;
-        for i in 1..cols {
-            let x = rect.left() + rect.width() * (i as f32 / cols as f32);
-            p.line_segment(
-                [Pos2::new(x, rect.top()), Pos2::new(x, rect.bottom())],
-                Stroke::new(0.7_f32, grid_col),
-            );
-        }
-        for j in 1..rows {
-            let y = rect.top() + rect.height() * (j as f32 / rows as f32);
-            p.line_segment(
-                [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-                Stroke::new(0.7_f32, grid_col),
-            );
-        }
-
-        let center = Pos2::new(rect.left() + rect.width() * 0.50, rect.top() + rect.height() * 0.50);
-        let base_r = (map_h * 0.145).clamp(28.0, 52.0);
-        p.circle_stroke(center, base_r * 1.9, Stroke::new(1.0_f32, grid_col));
-        p.circle_stroke(center, base_r * 3.1, Stroke::new(1.0_f32, grid_col));
-
-        // Dual-Ring Layout: Inner Ring (first 6) + Outer Ring (remaining 12+) so 18+ nations never overlap!
-        let inner_count = total_nodes.min(6);
-        let outer_count = total_nodes.saturating_sub(inner_count);
-        let inner_rx = (rect.width() * 0.255).max(95.0);
-        let inner_ry = (rect.height() * 0.255).max(62.0);
-        let outer_rx = (rect.width() * 0.435).max(145.0);
-        let outer_ry = (rect.height() * 0.425).max(104.0);
-
-        let node_pos_idx = |idx: usize| -> Pos2 {
-            if idx < inner_count {
-                let angle = -std::f32::consts::FRAC_PI_2
-                    + (idx as f32 / inner_count.max(1) as f32) * std::f32::consts::TAU;
-                Pos2::new(center.x + inner_rx * angle.cos(), center.y + inner_ry * angle.sin())
-            } else {
-                let oidx = idx - inner_count;
-                let stagger = std::f32::consts::PI / outer_count.max(1) as f32;
-                let angle = -std::f32::consts::FRAC_PI_2
-                    + stagger
-                    + (oidx as f32 / outer_count.max(1) as f32) * std::f32::consts::TAU;
-                Pos2::new(center.x + outer_rx * angle.cos(), center.y + outer_ry * angle.sin())
+        // Subtle starfield in Dark Mode
+        if is_dark_mode() {
+            for i in 0..42 {
+                let sx = rect.left() + ((i * 97 + 19) % 98 + 1) as f32 / 100.0 * rect.width();
+                let sy = rect.top() + ((i * 53 + 11) % 96 + 2) as f32 / 100.0 * rect.height();
+                p.circle_filled(Pos2::new(sx, sy), 1.1, Color32::from_rgba_unmultiplied(210, 230, 255, 80));
             }
+        }
+
+        let center = rect.center();
+        let radius = (globe_h * 0.44).min(avail_w * 0.43).max(110.0);
+
+        // Outer Planetary Atmosphere Glow
+        let atmo_col = if state.flags.ledger_rebalance {
+            Color32::from_rgb(250, 204, 21)
+        } else if is_dark_mode() {
+            Color32::from_rgb(56, 189, 248)
+        } else {
+            Color32::from_rgb(62, 132, 168)
         };
+        for ring in 1..=3 {
+            p.circle_filled(
+                center,
+                radius + ring as f32 * 5.5,
+                Color32::from_rgba_unmultiplied(atmo_col.r(), atmo_col.g(), atmo_col.b(), (24 / ring) as u8),
+            );
+        }
 
-        let flag_h = (map_h * 0.056).clamp(14.0, 22.0);
-        let flag_w = flag_h * 1.55;
+        // 3D Shaded Ocean Sphere
+        let ocean_outer = if is_dark_mode() {
+            Color32::from_rgb(10, 26, 54)
+        } else {
+            Color32::from_rgb(142, 186, 206)
+        };
+        let ocean_inner = if is_dark_mode() {
+            Color32::from_rgb(18, 52, 98)
+        } else {
+            Color32::from_rgb(176, 214, 226)
+        };
+        p.circle_filled(center, radius, ocean_outer);
+        p.circle_filled(
+            Pos2::new(center.x - radius * 0.14, center.y - radius * 0.14),
+            radius * 0.78,
+            ocean_inner,
+        );
 
-        // Draw connecting lanes
-        for (idx, fp) in state.foreign_powers.iter().enumerate() {
-            let target_pos = node_pos_idx(idx);
-            let (line_col, width): (Color32, f32) = if fp.annexed {
-                (Color32::from_rgba_unmultiplied(234, 179, 8, 175), 2.0)
-            } else if fp.at_war {
-                (accent_red(), 2.5)
-            } else if fp.puppet_state {
-                (accent_purple(), 1.9)
-            } else if fp.defense_alliance {
-                (accent_green(), 1.7)
-            } else if fp.trade_pact {
-                (accent_blue(), 1.4)
-            } else {
-                (
-                    if is_dark_mode() {
-                        Color32::from_rgba_unmultiplied(120, 145, 175, 42)
+        // 3D Latitude & Longitude Graticule Lines
+        let grat_col = if is_dark_mode() {
+            Color32::from_rgba_unmultiplied(90, 175, 235, 34)
+        } else {
+            Color32::from_rgba_unmultiplied(54, 88, 114, 46)
+        };
+        for lat_step in [-60.0_f32, -30.0, 0.0, 30.0, 60.0] {
+            let mut seg = Vec::new();
+            for step in 0..=72 {
+                let lon = -180.0 + step as f32 * 5.0;
+                let (pt, z) = project_ortho(lat_step, lon, globe.cam_lat, globe.cam_lon, center, radius);
+                if z > 0.0 {
+                    seg.push(pt);
+                } else if seg.len() >= 2 {
+                    p.add(egui::Shape::line(seg.clone(), Stroke::new(0.8_f32, grat_col)));
+                    seg.clear();
+                } else {
+                    seg.clear();
+                }
+            }
+            if seg.len() >= 2 {
+                p.add(egui::Shape::line(seg, Stroke::new(0.8_f32, grat_col)));
+            }
+        }
+        for lon_i in -6..6 {
+            let lon_val = lon_i as f32 * 30.0;
+            let mut seg = Vec::new();
+            for step in 0..=36 {
+                let lat = -90.0 + step as f32 * 5.0;
+                let (pt, z) = project_ortho(lat, lon_val, globe.cam_lat, globe.cam_lon, center, radius);
+                if z > 0.0 {
+                    seg.push(pt);
+                } else if seg.len() >= 2 {
+                    p.add(egui::Shape::line(seg.clone(), Stroke::new(0.8_f32, grat_col)));
+                    seg.clear();
+                } else {
+                    seg.clear();
+                }
+            }
+            if seg.len() >= 2 {
+                p.add(egui::Shape::line(seg, Stroke::new(0.8_f32, grat_col)));
+            }
+        }
+
+        // 6 Original Fictional Continents projected onto the 3D Sphere!
+        let land_fill = if is_dark_mode() {
+            Color32::from_rgba_unmultiplied(30, 88, 68, 178)
+        } else {
+            Color32::from_rgba_unmultiplied(154, 186, 134, 210)
+        };
+        let land_border = if is_dark_mode() {
+            Color32::from_rgba_unmultiplied(74, 186, 146, 120)
+        } else {
+            Color32::from_rgba_unmultiplied(84, 118, 72, 160)
+        };
+        for &(cname, poly_coords) in crate::world_gen::fictional_continents() {
+            let mut projected: Vec<Pos2> = Vec::new();
+            let mut sum_x = 0.0_f32;
+            let mut sum_y = 0.0_f32;
+            let mut vis_count = 0usize;
+            for &(plat, plon) in poly_coords {
+                let (pt, z) = project_ortho(plat, plon, globe.cam_lat, globe.cam_lon, center, radius);
+                if z > -0.05 {
+                    // Clamp slightly behind limb onto sphere rim for smooth continent silhouette
+                    let v = pt - center;
+                    let len = v.length();
+                    let clamped = if len > radius {
+                        center + v * (radius / len)
                     } else {
-                        Color32::from_rgba_unmultiplied(110, 96, 76, 52)
-                    },
-                    0.85,
-                )
-            };
-            p.line_segment([center, target_pos], Stroke::new(width, line_col));
-
-            if fp.at_war && !fp.annexed {
-                let mid = Pos2::new((center.x + target_pos.x) * 0.5, (center.y + target_pos.y) * 0.5);
-                p.circle_filled(mid, 9.5, Color32::from_rgb(138, 24, 28));
-                p.circle_stroke(mid, 9.5, Stroke::new(1.2_f32, accent_red()));
-                p.text(
-                    mid,
-                    egui::Align2::CENTER_CENTER,
-                    format!("{:+.0}", fp.war_score),
-                    FontId::proportional(8.8),
-                    Color32::WHITE,
-                );
+                        pt
+                    };
+                    projected.push(clamped);
+                    if z > 0.08 {
+                        sum_x += clamped.x;
+                        sum_y += clamped.y;
+                        vis_count += 1;
+                    }
+                }
+            }
+            if projected.len() >= 3 {
+                p.add(egui::Shape::convex_polygon(
+                    projected,
+                    land_fill,
+                    Stroke::new(1.1_f32, land_border),
+                ));
+                if vis_count >= 3 {
+                    let lbl_pos = Pos2::new(sum_x / vis_count as f32, sum_y / vis_count as f32);
+                    p.text(
+                        lbl_pos,
+                        egui::Align2::CENTER_CENTER,
+                        cname.to_uppercase(),
+                        FontId::proportional((10.0 * metrics.scale).clamp(8.5, 12.5)),
+                        if is_dark_mode() {
+                            Color32::from_rgba_unmultiplied(192, 236, 214, 115)
+                        } else {
+                            Color32::from_rgba_unmultiplied(46, 68, 44, 140)
+                        },
+                    );
+                }
             }
         }
 
-        // Player Sovereign Capital Hub at center
-        let hub_r = (base_r * 0.92).min(map_h * 0.18);
-        let hub_stroke = if state.flags.ledger_rebalance || state.is_global_hegemon() {
-            accent_gold()
-        } else {
-            accent_blue()
-        };
-        let hub_fill = Color32::from_rgba_unmultiplied(
-            hub_stroke.r(),
-            hub_stroke.g(),
-            hub_stroke.b(),
-            if is_dark_mode() { 34 } else { 42 },
-        );
-        p.circle_filled(center, hub_r, hub_fill);
-        p.circle_stroke(center, hub_r, Stroke::new(1.8_f32, hub_stroke));
+        // Player Sovereign Capital on the Globe (lat=20, lon=0)
+        let (cap_pos, cap_z) = project_ortho(20.0, 0.0, globe.cam_lat, globe.cam_lon, center, radius);
 
-        let our_flag_rect = Rect::from_center_size(
-            Pos2::new(center.x, center.y - 6.0),
-            Vec2::new(flag_w * 1.4, flag_h * 1.4),
-        );
-        paint_nation_flag_at(
-            p,
-            our_flag_rect,
-            state.regime,
-            state.economy,
-            state.religion_policy,
-            state.flags.ledger_rebalance,
-            state.is_global_hegemon(),
-        );
-        p.text(
-            Pos2::new(center.x, our_flag_rect.bottom() + 8.5),
-            egui::Align2::CENTER_CENTER,
-            &state.nation_name,
-            FontId::proportional((11.0 * metrics.scale).clamp(9.5, 13.5)),
-            if state.flags.ledger_rebalance { accent_gold() } else { text_primary() },
-        );
-
-        let hover_pos = ui.input(|i| i.pointer.hover_pos());
-        let click_pos = if response.clicked() {
-            response.interact_pointer_pos()
-        } else {
-            None
-        };
-        let mut tooltip_text: Option<String> = None;
-
-        for (idx, fp) in state.foreign_powers.iter().enumerate() {
-            let pos = node_pos_idx(idx);
-            let card_w = (flag_w + 62.0 * metrics.scale).clamp(88.0, 146.0);
-            let card_h = (flag_h + 13.0).clamp(28.0, 39.0);
-            let node_rect = Rect::from_center_size(pos, Vec2::new(card_w, card_h));
-            let hovered = hover_pos.map(|hp| node_rect.contains(hp)).unwrap_or(false);
-
-            let border_col = if fp.annexed {
-                accent_gold()
-            } else if fp.at_war || fp.is_rebel_state {
+        // Curved 3D Strategic Arcs from Sovereign Capital to Wars, Annexed, Clients & Allies
+        for fp in &state.foreign_powers {
+            if !(fp.at_war || fp.annexed || fp.puppet_state || fp.defense_alliance) {
+                continue;
+            }
+            let (tpos, tz) = project_ortho(fp.lat, fp.lon, globe.cam_lat, globe.cam_lon, center, radius);
+            if cap_z <= -0.15 && tz <= -0.15 {
+                continue;
+            }
+            let arc_col = if fp.at_war {
                 accent_red()
+            } else if fp.annexed {
+                Color32::from_rgba_unmultiplied(250, 204, 21, 185)
             } else if fp.puppet_state {
                 accent_purple()
-            } else if hovered {
-                accent_cyan()
             } else {
-                border_subtle()
+                accent_green()
             };
-            let node_bg = if hovered {
-                if is_dark_mode() {
-                    Color32::from_rgb(32, 46, 68)
+            let steps = 12;
+            let mut pts = Vec::with_capacity(steps + 1);
+            for s in 0..=steps {
+                let f = s as f32 / steps as f32;
+                let ilat = 20.0 + (fp.lat - 20.0) * f;
+                let mut dlon = fp.lon - 0.0;
+                if dlon > 180.0 { dlon -= 360.0; }
+                if dlon < -180.0 { dlon += 360.0; }
+                let ilon = dlon * f;
+                let lift = 1.0 + (f * std::f32::consts::PI).sin() * 0.09;
+                let (pt, z) = project_ortho(ilat, ilon, globe.cam_lat, globe.cam_lon, center, radius * lift);
+                if z > 0.0 {
+                    pts.push(pt);
+                } else if pts.len() >= 2 {
+                    p.add(egui::Shape::line(pts.clone(), Stroke::new(1.5_f32, arc_col)));
+                    pts.clear();
                 } else {
-                    Color32::from_rgb(255, 252, 244)
+                    pts.clear();
                 }
-            } else if is_dark_mode() {
-                Color32::from_rgba_unmultiplied(18, 26, 40, 240)
-            } else {
-                Color32::from_rgba_unmultiplied(250, 247, 238, 242)
-            };
-            p.rect_filled(node_rect, CornerRadius::same(6), node_bg);
-            p.rect_stroke(
-                node_rect,
-                CornerRadius::same(6),
-                Stroke::new(if hovered || fp.at_war || fp.annexed { 1.5_f32 } else { 1.0_f32 }, border_col),
-                egui::StrokeKind::Inside,
-            );
-
-            let f_rect = Rect::from_min_size(
-                Pos2::new(node_rect.left() + 4.5, node_rect.center().y - flag_h * 0.5),
-                Vec2::new(flag_w, flag_h),
-            );
-            paint_foreign_flag_at(p, f_rect, fp);
-
-            let text_x = f_rect.right() + 4.5;
-            p.text(
-                Pos2::new(text_x, node_rect.center().y - 5.0),
-                egui::Align2::LEFT_CENTER,
-                &fp.short_name,
-                FontId::proportional((9.2 * metrics.scale).clamp(8.2, 11.4)),
-                text_primary(),
-            );
-            let (sub_txt, sub_col) = if fp.annexed {
-                ("★ ANNEXED".to_string(), accent_gold())
-            } else if fp.is_rebel_state && fp.at_war {
-                (format!("🔥 {:+.0}", fp.war_score), accent_red())
-            } else if fp.at_war {
-                (format!("⚔ {:+.0}", fp.war_score), accent_red())
-            } else if fp.puppet_state {
-                ("👑 CLIENT".to_string(), accent_purple())
-            } else if fp.defense_alliance {
-                (format!("🛡 {:+.0}", fp.relation), accent_green())
-            } else {
-                (format!("{:+.0}", fp.relation), severity_color(fp.relation + 50.0, true))
-            };
-            p.text(
-                Pos2::new(text_x, node_rect.center().y + 6.0),
-                egui::Align2::LEFT_CENTER,
-                sub_txt,
-                FontId::proportional((8.4 * metrics.scale).clamp(7.8, 10.5)),
-                sub_col,
-            );
-
-            if hovered {
-                tooltip_text = Some(format!(
-                    "{} ({})\nStatus: {}\nMilitary: {:.0} | Economy: {:.0} | Relations: {:+.0}\nClick to open Military & Geopolitics",
-                    fp.name,
-                    fp.ideology,
-                    if fp.annexed {
-                        "Annexed Province"
-                    } else if fp.at_war {
-                        "AT WAR"
-                    } else if fp.puppet_state {
-                        "Loyal Client State"
-                    } else if fp.defense_alliance {
-                        "Defense Ally"
-                    } else {
-                        "Independent Power"
-                    },
-                    fp.military_power,
-                    fp.economic_power,
-                    fp.relation
-                ));
             }
-            if let Some(cp) = click_pos {
-                if node_rect.contains(cp) {
-                    clicked_power = Some(fp.id);
+            if pts.len() >= 2 {
+                p.add(egui::Shape::line(pts, Stroke::new(1.5_f32, arc_col)));
+            }
+            let _ = tpos;
+        }
+
+        // Plot ALL 178+ Countries on the 3D Sphere!
+        let hover_pos = ui.input(|i| i.pointer.hover_pos());
+        let click_pos = if response.clicked() { response.interact_pointer_pos() } else { None };
+        let dbl_pos = if response.double_clicked() { response.interact_pointer_pos() } else { None };
+
+        let mut hovered_fp: Option<(&ForeignPower, Pos2)> = None;
+        let mut best_hover_dist = 18.0_f32;
+        let mut best_click_dist = 18.0_f32;
+        let mut clicked_id: Option<ForeignPowerId> = None;
+
+        // Pass 1: Draw all minor WorldState dots first, then Major/Active/Selected on top
+        for pass in 0..2 {
+            for fp in &state.foreign_powers {
+                let is_prominent = fp.is_major_power()
+                    || fp.at_war
+                    || fp.annexed
+                    || fp.puppet_state
+                    || fp.is_rebel_state
+                    || globe.selected == Some(fp.id);
+                if (pass == 0 && is_prominent) || (pass == 1 && !is_prominent) {
+                    continue;
+                }
+
+                let (pt, z) = project_ortho(fp.lat, fp.lon, globe.cam_lat, globe.cam_lon, center, radius);
+                if z <= 0.04 {
+                    continue;
+                }
+
+                let marker_col = if fp.annexed {
+                    accent_gold()
+                } else if fp.at_war || fp.is_rebel_state {
+                    accent_red()
+                } else if fp.puppet_state {
+                    accent_purple()
+                } else if fp.defense_alliance {
+                    accent_green()
+                } else if fp.trade_pact {
+                    accent_blue()
+                } else if fp.is_major_power() {
+                    accent_cyan()
+                } else {
+                    Color32::from_rgb(200, 218, 238)
+                };
+
+                let base_r = if is_prominent { 4.8 } else { 2.8 };
+                let r_dot = (base_r * (0.62 + 0.48 * z)).max(2.0);
+                p.circle_filled(pt, r_dot, marker_col);
+
+                if globe.selected == Some(fp.id) {
+                    p.circle_stroke(pt, r_dot + 4.0, Stroke::new(1.8_f32, accent_gold()));
+                }
+
+                // Draw compact procedural vector flag + short name for prominent visible powers
+                if is_prominent && z > 0.25 {
+                    let fh = (11.0 * (0.75 + 0.35 * z) * metrics.scale).clamp(9.0, 15.0);
+                    let fw = fh * 1.55;
+                    let frect = Rect::from_min_size(Pos2::new(pt.x + 5.0, pt.y - fh * 0.5), Vec2::new(fw, fh));
+                    paint_foreign_flag_at(&p, frect, fp);
+                    if z > 0.45 || globe.selected == Some(fp.id) || fp.at_war {
+                        p.text(
+                            Pos2::new(frect.right() + 3.0, pt.y),
+                            egui::Align2::LEFT_CENTER,
+                            &fp.short_name,
+                            FontId::proportional((8.8 * metrics.scale).clamp(8.0, 11.2)),
+                            if fp.annexed { accent_gold() } else if is_dark_mode() { Color32::WHITE } else { Color32::from_rgb(16, 24, 38) },
+                        );
+                    }
+                }
+
+                if let Some(hp) = hover_pos {
+                    let dist = pt.distance(hp);
+                    if dist < best_hover_dist {
+                        best_hover_dist = dist;
+                        hovered_fp = Some((fp, pt));
+                    }
+                }
+                if let Some(cp) = click_pos {
+                    let dist = pt.distance(cp);
+                    if dist < best_click_dist {
+                        best_click_dist = dist;
+                        clicked_id = Some(fp.id);
+                    }
+                }
+                if let Some(dp) = dbl_pos {
+                    if pt.distance(dp) < 18.0 {
+                        double_clicked_open = Some(fp.id);
+                    }
                 }
             }
         }
 
-        p.rect_stroke(
-            rect,
-            CornerRadius::same(8),
-            Stroke::new(1.0_f32, border_subtle()),
-            egui::StrokeKind::Inside,
+        if let Some(cid) = clicked_id {
+            globe.selected = Some(cid);
+        }
+
+        // Draw Player's Sovereign Capital Flag & Halo on top!
+        if cap_z > 0.04 {
+            p.circle_stroke(cap_pos, 10.0, Stroke::new(2.0_f32, accent_gold()));
+            let fh = (16.0 * metrics.scale).clamp(13.0, 22.0);
+            let fw = fh * 1.55;
+            let frect = Rect::from_center_size(Pos2::new(cap_pos.x, cap_pos.y - fh * 0.8), Vec2::new(fw, fh));
+            paint_nation_flag_at(
+                &p,
+                frect,
+                state.regime,
+                state.economy,
+                state.religion_policy,
+                state.flags.ledger_rebalance,
+                state.is_global_hegemon(),
+            );
+            p.text(
+                Pos2::new(cap_pos.x, cap_pos.y + 13.0),
+                egui::Align2::CENTER_CENTER,
+                format!("★ {}", state.nation_name),
+                FontId::proportional((10.5 * metrics.scale).clamp(9.5, 13.0)),
+                accent_gold(),
+            );
+        }
+
+        // Crisp planetary rim stroke
+        p.circle_stroke(center, radius, Stroke::new(1.8_f32, atmo_col));
+
+        // Floating HUD Legend & Drag Hint in corners
+        p.text(
+            Pos2::new(rect.left() + 10.0, rect.bottom() - 12.0),
+            egui::Align2::LEFT_CENTER,
+            "🖱 Drag to Rotate 3D Globe  •  Click Any Nation to Inspect & Command  •  Double-Click for Full Diplomacy",
+            FontId::proportional((9.5 * metrics.scale).clamp(8.5, 11.5)),
+            text_muted(),
+        );
+        p.text(
+            Pos2::new(rect.right() - 10.0, rect.top() + 12.0),
+            egui::Align2::RIGHT_CENTER,
+            format!("CAM {:.0}°N, {:.0}°E", globe.cam_lat, globe.cam_lon),
+            FontId::proportional((9.5 * metrics.scale).clamp(8.5, 11.5)),
+            accent_cyan(),
         );
 
-        if let Some(tip) = tooltip_text {
-            response.on_hover_text(tip);
+        // Highlight Hovered Country on Globe + Rich Hover Tooltip
+        if let Some((fp, pt)) = hovered_fp {
+            p.circle_stroke(pt, 9.0, Stroke::new(1.8_f32, accent_gold()));
+            let fh = 18.0;
+            let fw = fh * 1.55;
+            let frect = Rect::from_min_size(Pos2::new(pt.x + 10.0, pt.y - 24.0), Vec2::new(fw, fh));
+            paint_foreign_flag_at(&p, frect, fp);
+            response.on_hover_text(format!(
+                "{} [{}]\n{}\nMilitary: {:.0} | Economy: {:.0} | Relations: {:+.0}\nStatus: {}\n(Click to select for quick actions)",
+                fp.name,
+                fp.region,
+                fp.ideology,
+                fp.military_power,
+                fp.economic_power,
+                fp.relation,
+                if fp.annexed {
+                    "★ Annexed Province"
+                } else if fp.at_war {
+                    "⚔ AT WAR"
+                } else if fp.puppet_state {
+                    "👑 Client State"
+                } else if fp.defense_alliance {
+                    "🛡 Defense Ally"
+                } else if fp.trade_pact {
+                    "Trade Partner"
+                } else {
+                    "Independent Nation"
+                }
+            ));
         }
     });
 
-    clicked_power
+    double_clicked_open
 }
 
 pub fn compute_era_label(state: &NationState) -> &'static str {

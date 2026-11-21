@@ -27,12 +27,15 @@ pub struct NationSimApp {
     log_filter: Option<LogCategory>,
     status_toast: Option<(String, Instant)>,
 
-    // Auto-play, theme & scaling controls
+    // Auto-play, theme, globe & filter controls
     auto_play: bool,
     sim_speed: u8, // 1, 2, or 4
     ui_zoom: f32,  // 0.9, 1.0, 1.15, 1.25
     dark_mode: bool,
+    globe: GlobeViewState,
+    dip_filter: DiplomacyFilterState,
     last_tick: Instant,
+    last_frame: Instant,
     header_taps: u8,
     last_tap: Instant,
 
@@ -65,7 +68,10 @@ impl NationSimApp {
             sim_speed: 1,
             ui_zoom: 1.0,
             dark_mode: true,
+            globe: GlobeViewState::default(),
+            dip_filter: DiplomacyFilterState::default(),
             last_tick: Instant::now(),
+            last_frame: Instant::now(),
             header_taps: 0,
             last_tap: Instant::now(),
             use_custom_leader_for_presets: true,
@@ -240,6 +246,19 @@ fn preset_flag_spec(preset: ScenarioPreset) -> (RegimeType, EconomicSystem, Reli
 impl eframe::App for NationSimApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_zoom_factor(self.ui_zoom);
+
+        let dt = self.last_frame.elapsed().as_secs_f32().clamp(0.0, 0.1);
+        self.last_frame = Instant::now();
+
+        if self.screen == AppScreen::Dashboard
+            && self.active_tab == DashboardTab::Overview
+            && self.globe.auto_spin
+            && self.state.active_event.is_none()
+            && self.state.game_over.is_none()
+        {
+            self.globe.cam_lon = (self.globe.cam_lon + dt * 7.5 + 180.0) % 360.0 - 180.0;
+            ctx.request_repaint_after(Duration::from_millis(24));
+        }
 
         if self.screen == AppScreen::Dashboard
             && self.auto_play
@@ -1328,7 +1347,15 @@ impl NationSimApp {
 
                 match self.active_tab {
                     DashboardTab::Overview => {
-                        if render_overview_tab(ui, &self.state, metrics).is_some() {
+                        if let Some(pid) = render_overview_tab(
+                            ui,
+                            &mut self.state,
+                            &mut self.globe,
+                            &mut toast_out,
+                            metrics,
+                        ) {
+                            self.dip_filter.search = self.state.foreign(pid).short_name.clone();
+                            self.dip_filter.status = DipStatusFilter::All;
                             jump_to_military = true;
                         }
                     }
@@ -1337,9 +1364,13 @@ impl NationSimApp {
                     DashboardTab::ReligionExtremism => {
                         render_religion_extremism_tab(ui, &mut self.state, &mut toast_out, metrics)
                     }
-                    DashboardTab::MilitaryDiplomacy => {
-                        render_military_diplomacy_tab(ui, &mut self.state, &mut toast_out, metrics)
-                    }
+                    DashboardTab::MilitaryDiplomacy => render_military_diplomacy_tab(
+                        ui,
+                        &mut self.state,
+                        &mut self.dip_filter,
+                        &mut toast_out,
+                        metrics,
+                    ),
                     DashboardTab::ProgramsOps => {
                         render_programs_ops_tab(ui, &mut self.state, &mut toast_out, metrics)
                     }

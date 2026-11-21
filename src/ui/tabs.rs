@@ -8,6 +8,63 @@ use crate::simulation::{
 use crate::ui::widgets::*;
 use eframe::egui::{self, Color32, RichText, Stroke};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DipStatusFilter {
+    #[default]
+    MajorPowers,
+    All,
+    AtWar,
+    Annexed,
+    Clients,
+    Rebels,
+    Allies,
+}
+
+impl DipStatusFilter {
+    pub fn all() -> &'static [DipStatusFilter] {
+        &[
+            Self::MajorPowers,
+            Self::All,
+            Self::AtWar,
+            Self::Annexed,
+            Self::Clients,
+            Self::Rebels,
+            Self::Allies,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::MajorPowers => "Major Powers",
+            Self::All => "All World Nations",
+            Self::AtWar => "⚔ At War",
+            Self::Annexed => "★ Annexed",
+            Self::Clients => "👑 Clients",
+            Self::Rebels => "🔥 Rebels",
+            Self::Allies => "🛡 Allies/Trade",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DiplomacyFilterState {
+    pub search: String,
+    pub region: String, // "" = All Regions
+    pub status: DipStatusFilter,
+    pub page_limit: usize,
+}
+
+impl Default for DiplomacyFilterState {
+    fn default() -> Self {
+        Self {
+            search: String::new(),
+            region: String::new(),
+            status: DipStatusFilter::MajorPowers,
+            page_limit: 30,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DashboardTab {
     Overview,
@@ -77,7 +134,9 @@ macro_rules! two_col_responsive {
 
 pub fn render_overview_tab(
     ui: &mut egui::Ui,
-    state: &NationState,
+    state: &mut NationState,
+    globe: &mut GlobeViewState,
+    status_msg: &mut Option<String>,
     metrics: &UiMetrics,
 ) -> Option<ForeignPowerId> {
     ui.label(
@@ -136,8 +195,121 @@ pub fn render_overview_tab(
         ui.add_space(10.0);
     }
 
-    // Interactive Grand-Strategy World Theater Chart
-    let clicked_power = draw_world_theater_map(ui, state, metrics);
+    // Interactive 3D Planetary Globe + Selected Country Quick-Command Inspector
+    let mut open_in_diplomacy = draw_interactive_globe(ui, state, globe, metrics);
+
+    if let Some(sel_id) = globe.selected {
+        if state.foreign_powers.iter().any(|p| p.id == sel_id) {
+            ui.add_space(8.0);
+            let fp = state.foreign(sel_id).clone();
+            let mut quick_act: Option<&'static str> = None;
+            let god = state.flags.ledger_rebalance;
+            let visit_pc = if god { 0 } else { 10 };
+            let arms_pc = if god { 0 } else { 8 };
+            let annex_pc = if god { 0 } else { 24 };
+            let split_pc = if god { 0 } else { 18 };
+
+            hero_card_frame(if fp.annexed {
+                border_gold()
+            } else if fp.at_war {
+                accent_red()
+            } else {
+                accent_cyan()
+            })
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let fh = (metrics.flag_h * 1.15).clamp(26.0, 44.0);
+                    let fw = fh * 1.55;
+                    draw_foreign_flag(ui, &fp, fw, fh);
+                    ui.add_space(6.0);
+                    ui.vertical(|ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(
+                                RichText::new(&fp.name)
+                                    .color(if fp.annexed { accent_gold() } else { text_primary() })
+                                    .size(metrics.fs(14.0))
+                                    .strong(),
+                            );
+                            badge(ui, &fp.region, accent_blue());
+                            if fp.annexed {
+                                badge(ui, "★ ANNEXED", accent_gold());
+                            } else if fp.at_war {
+                                badge(ui, &format!("⚔ WAR {:+.0}", fp.war_score), accent_red());
+                            } else if fp.puppet_state {
+                                badge(ui, "👑 CLIENT", accent_purple());
+                            }
+                        });
+                        ui.label(
+                            RichText::new(format!(
+                                "{}  •  Mil {:.0}  •  Econ {:.0}  •  Rel {:+.0}  •  ({:.1}°, {:.1}°)",
+                                fp.ideology, fp.military_power, fp.economic_power, fp.relation, fp.lat, fp.lon
+                            ))
+                            .color(text_muted())
+                            .size(11.5),
+                        );
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("✖").clicked() {
+                            globe.selected = None;
+                        }
+                        if ui.small_button("🔍 Open in Diplomacy").clicked() {
+                            open_in_diplomacy = Some(sel_id);
+                        }
+                    });
+                });
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    if fp.annexed {
+                        if ui.small_button("🏳 Release Allied Client").clicked() {
+                            quick_act = Some("release_nation");
+                        }
+                    } else if !fp.at_war {
+                        if ui.small_button(format!("✈ State Visit ({} PC)", visit_pc)).clicked() {
+                            quick_act = Some("diplomatic_visit");
+                        }
+                        if ui.small_button("Trade Pact").clicked() {
+                            quick_act = Some("trade_pact");
+                        }
+                        if fp.id != ForeignPowerId::GlobalMonetaryCouncil {
+                            if ui.small_button(format!("💰 Sell Weapons ({} PC)", arms_pc)).clicked() {
+                                quick_act = Some("sell_arms");
+                            }
+                            if fp.puppet_state {
+                                if ui.small_button(RichText::new(format!("👑 Annex Client ({} PC)", annex_pc)).color(accent_gold()).strong()).clicked() {
+                                    quick_act = Some("annex_country");
+                                }
+                            } else {
+                                if ui.small_button(RichText::new("⚔ Declare War").color(accent_red()).strong()).clicked() {
+                                    quick_act = Some("declare_war");
+                                }
+                            }
+                        }
+                    } else {
+                        if ui.small_button("🕊 Peace Treaty").clicked() {
+                            quick_act = Some("sue_peace");
+                        }
+                        if ui.small_button(format!("🔥 Foment Split ({} PC)", split_pc)).clicked() {
+                            quick_act = Some("foment_split");
+                        }
+                        if fp.war_score >= 70.0 {
+                            if ui.small_button(RichText::new(format!("★ Conquer & Annex ({} PC)", annex_pc)).color(accent_gold()).strong()).clicked() {
+                                quick_act = Some("annex_country");
+                            }
+                        }
+                    }
+                });
+            });
+
+            if let Some(act) = quick_act {
+                match diplomatic_action(state, sel_id, act) {
+                    Ok(m) => *status_msg = Some(m),
+                    Err(e) => *status_msg = Some(format!("Action Blocked: {}", e)),
+                }
+            }
+        }
+    }
+
+    let clicked_power = open_in_diplomacy;
     ui.add_space(10.0);
 
     // Achievements / Trophies Bar
@@ -674,6 +846,7 @@ pub fn render_religion_extremism_tab(
 pub fn render_military_diplomacy_tab(
     ui: &mut egui::Ui,
     state: &mut NationState,
+    filter: &mut DiplomacyFilterState,
     status_msg: &mut Option<String>,
     metrics: &UiMetrics,
 ) {
@@ -855,7 +1028,7 @@ pub fn render_military_diplomacy_tab(
 
     ui.add_space(10.0);
 
-    // Foreign Powers Diplomatic Matrix
+    // Foreign Powers Diplomatic Matrix with Search, Continent Region & Status Filters for 178+ Nations!
     card_frame().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(format!("🌍 WORLD NATIONS & DIPLOMACY ({} POWERS)", state.foreign_powers.len())).color(accent_cyan()).size(metrics.fs(12.5)).strong());
@@ -866,6 +1039,75 @@ pub fn render_military_diplomacy_tab(
         });
         ui.add_space(6.0);
 
+        // Search & Region Filter Bar
+        ui.horizontal_wrapped(|ui| {
+            ui.label("🔍 Search:");
+            ui.add(egui::TextEdit::singleline(&mut filter.search).desired_width(175.0).hint_text("Country name..."));
+            if !filter.search.is_empty() && ui.small_button("✖").clicked() {
+                filter.search.clear();
+            }
+            ui.add_space(6.0);
+            ui.label("Continent:");
+            egui::ComboBox::from_id_salt("dip_region_filter_cb")
+                .selected_text(if filter.region.is_empty() { "All Continents" } else { &filter.region })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut filter.region, String::new(), "All Continents");
+                    for reg in ["Valdoria", "Aethelis", "Zahara", "Indravara", "Solterra", "Thalassia"] {
+                        ui.selectable_value(&mut filter.region, reg.to_string(), reg);
+                    }
+                });
+        });
+        ui.add_space(4.0);
+        ui.horizontal_wrapped(|ui| {
+            for &st in DipStatusFilter::all() {
+                if ui.selectable_label(filter.status == st, st.label()).clicked() {
+                    filter.status = st;
+                    filter.page_limit = 30;
+                }
+            }
+        });
+        ui.add_space(6.0);
+
+        let query_lower = filter.search.trim().to_lowercase();
+        let filtered_indices: Vec<usize> = state
+            .foreign_powers
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                if !query_lower.is_empty()
+                    && !p.name.to_lowercase().contains(&query_lower)
+                    && !p.short_name.to_lowercase().contains(&query_lower)
+                {
+                    return false;
+                }
+                if !filter.region.is_empty() && p.region != filter.region {
+                    return false;
+                }
+                match filter.status {
+                    DipStatusFilter::MajorPowers => p.is_major_power() || p.at_war || p.annexed || p.puppet_state || !query_lower.is_empty(),
+                    DipStatusFilter::All => true,
+                    DipStatusFilter::AtWar => p.at_war && !p.annexed,
+                    DipStatusFilter::Annexed => p.annexed,
+                    DipStatusFilter::Clients => p.puppet_state && !p.annexed,
+                    DipStatusFilter::Rebels => p.is_rebel_state && !p.annexed,
+                    DipStatusFilter::Allies => (p.defense_alliance || p.trade_pact) && !p.annexed,
+                }
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        ui.label(
+            RichText::new(format!(
+                "Showing {} of {} matching nations (out of {} total world powers)",
+                filtered_indices.len().min(filter.page_limit),
+                filtered_indices.len(),
+                state.foreign_powers.len()
+            ))
+            .color(text_muted())
+            .size(11.0),
+        );
+        ui.add_space(4.0);
+
         let mut pending_dip: Option<(ForeignPowerId, &'static str)> = None;
         let annex_cost = if state.flags.ledger_rebalance { 0 } else { 24 };
         let puppet_cost = if state.flags.ledger_rebalance { 0 } else { 18 };
@@ -875,7 +1117,8 @@ pub fn render_military_diplomacy_tab(
         let fp_flag_h = (metrics.flag_h * 0.98).clamp(22.0, 42.0);
         let fp_flag_w = fp_flag_h * 1.55;
 
-        for p in &state.foreign_powers {
+        for &idx in filtered_indices.iter().take(filter.page_limit) {
+            let p = &state.foreign_powers[idx];
             let border = if p.annexed {
                 border_gold()
             } else if p.at_war || p.is_rebel_state {
@@ -1034,6 +1277,18 @@ pub fn render_military_diplomacy_tab(
                     }
                 });
             ui.add_space(5.0);
+        }
+
+        if filtered_indices.len() > filter.page_limit {
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.button(format!("Load +40 More Nations ({} remaining)", filtered_indices.len() - filter.page_limit)).clicked() {
+                    filter.page_limit += 40;
+                }
+                if ui.button("Show All Matching").clicked() {
+                    filter.page_limit = filtered_indices.len();
+                }
+            });
         }
 
         if let Some((pid, act)) = pending_dip {

@@ -714,6 +714,9 @@ fn update_foreign_powers_and_wars(state: &mut NationState) {
             ForeignPowerId::OakhavenUnion => {
                 if state.stability >= 55.0 { 0.5 } else { -0.2 }
             }
+            ForeignPowerId::WorldState(n) => {
+                if state.stability >= 55.0 && (n % 3 == 0) { 0.25 } else if initial_active_wars > 2 { -0.3 } else { 0.05 }
+            }
             ForeignPowerId::Emergent(_) => {
                 if p.is_rebel_state { -1.2 } else { 0.3 }
             }
@@ -1117,7 +1120,7 @@ pub fn spawn_split_country(
     if parent_id == ForeignPowerId::GlobalMonetaryCouncil {
         return Err("Cannot split a multilateral financial council".into());
     }
-    let (parent_name, parent_short, parent_mil, parent_econ) = {
+    let (parent_name, parent_short, parent_mil, parent_econ, parent_lat, parent_lon, parent_reg) = {
         let p = state.foreign(parent_id);
         if p.annexed {
             return Err("Cannot split an already-annexed territory".into());
@@ -1125,7 +1128,15 @@ pub fn spawn_split_country(
         if p.military_power < 18.0 && p.economic_power < 18.0 {
             return Err(format!("{} is too small to fracture further", p.name));
         }
-        (p.name.clone(), p.short_name.clone(), p.military_power, p.economic_power)
+        (
+            p.name.clone(),
+            p.short_name.clone(),
+            p.military_power,
+            p.economic_power,
+            p.lat,
+            p.lon,
+            p.region.clone(),
+        )
     };
 
     let emergent_num = state.next_emergent_id.max(1);
@@ -1188,6 +1199,9 @@ pub fn spawn_split_country(
         is_rebel_state: false,
         parent_origin: Some(parent_name.clone()),
         flag_seed: ((emergent_num * 7 + 3) % 12) as u8,
+        lat: (parent_lat + 4.5).clamp(-65.0, 68.0),
+        lon: ((parent_lon + 6.0 + 180.0) % 360.0) - 180.0,
+        region: if parent_reg.is_empty() { "Frontier".into() } else { parent_reg },
     };
 
     state.foreign_powers.push(child);
@@ -1247,6 +1261,9 @@ pub fn spawn_domestic_rebel_state(state: &mut NationState) -> Result<String, Str
         is_rebel_state: true,
         parent_origin: Some(state.nation_name.clone()),
         flag_seed: ((emergent_num * 5 + 1) % 12) as u8,
+        lat: (18.0 + (emergent_num as f32 * 3.0) % 14.0).clamp(-60.0, 60.0),
+        lon: (-10.0 + (emergent_num as f32 * 7.0) % 24.0),
+        region: "Homeland Frontier".into(),
     };
 
     state.foreign_powers.push(rebel);
@@ -2458,9 +2475,12 @@ mod tests {
         state.political_capital = 100.0;
         state.treasury_bn = 250.0;
 
-        // 18 fictional countries total, zero real-world "Bharat" name
-        assert_eq!(state.foreign_powers.len(), 18);
-        assert!(state.foreign_powers.iter().all(|p| !p.name.contains("Bharat")));
+        // 178 fictional countries total (18 core + 160 generated), all unique & zero real-world names
+        assert_eq!(state.foreign_powers.len(), 178);
+        let unique_names: std::collections::HashSet<&str> =
+            state.foreign_powers.iter().map(|p| p.short_name.as_str()).collect();
+        assert_eq!(unique_names.len(), 178);
+        assert!(state.foreign_powers.iter().all(|p| !p.name.contains("Bharat") && !p.region.is_empty()));
 
         // Army, Air Force & Navy procurement
         let d0 = state.armed_forces.army_divisions;
