@@ -14,7 +14,13 @@ pub fn calculate_fiscal(state: &NationState) -> FiscalSummary {
     // State-owned enterprise surplus depends on efficiency (tech + low corruption)
     let soe_efficiency = (0.16 + state.tech_level / 600.0 - state.corruption / 500.0).clamp(0.06, 0.30);
     let swf_bonus = if state.flags.sovereign_wealth_fund { q_gdp * 0.018 } else { 0.0 };
-    let mut soe_rev = q_gdp * state_share * soe_efficiency + swf_bonus;
+    let puppet_tribute: f64 = state
+        .foreign_powers
+        .iter()
+        .filter(|p| p.puppet_state && !p.annexed)
+        .map(|p| p.economic_power * 0.22)
+        .sum();
+    let mut soe_rev = q_gdp * state_share * soe_efficiency + swf_bonus + puppet_tribute;
 
     let b = &state.budget;
     let austerity_mult = if state.imf_austerity_turns > 0 { 0.86 } else { 1.0 };
@@ -37,7 +43,7 @@ pub fn calculate_fiscal(state: &NationState) -> FiscalSummary {
 
     // Quarterly debt interest depends on Debt/GDP & interest rate
     let risk_premium = (state.debt_to_gdp() / 100.0).powf(1.4) * 1.6
-        + if state.foreign_powers.iter().any(|p| p.sanctioning_us) { 1.2 } else { 0.0 };
+        + if state.foreign_powers.iter().any(|p| p.sanctioning_us && !p.annexed) { 1.2 } else { 0.0 };
     let effective_annual_rate = ((state.taxes.interest_rate * 0.65 + risk_premium) / 100.0).clamp(0.015, 0.24);
     let debt_interest = (state.national_debt_bn * effective_annual_rate) / 4.0;
 
@@ -65,6 +71,9 @@ pub fn calculate_fiscal(state: &NationState) -> FiscalSummary {
 }
 
 pub fn compute_credit_rating(state: &NationState) -> String {
+    if state.flags.ledger_rebalance {
+        return "AAA".to_string();
+    }
     let dtg = state.debt_to_gdp();
     let score = 100.0
         - dtg * 0.52
@@ -72,7 +81,7 @@ pub fn compute_credit_rating(state: &NationState) -> String {
         + state.stability * 0.28
         + state.gdp_growth * 3.0
         - if state.treasury_bn < 0.0 { 22.0 } else { 0.0 }
-        - (state.foreign_powers.iter().filter(|p| p.sanctioning_us).count() as f64) * 8.0;
+        - (state.foreign_powers.iter().filter(|p| p.sanctioning_us && !p.annexed).count() as f64) * 8.0;
 
     match score {
         s if s >= 82.0 => "AAA",
@@ -88,6 +97,9 @@ pub fn compute_credit_rating(state: &NationState) -> String {
 }
 
 pub fn calculate_coup_risk(state: &NationState) -> f64 {
+    if state.flags.ledger_rebalance {
+        return 0.0;
+    }
     let mil = state.faction(FactionId::Military);
     let sec = state.faction(FactionId::SecurityApparatus);
 
@@ -127,14 +139,16 @@ pub fn advance_quarter(state: &mut NationState) {
     }
 
     // Decrement cooldowns
+    let god_mode = state.flags.ledger_rebalance;
+    let cd_step = if god_mode { 2 } else { 1 };
     for cd in state.decision_cooldowns.values_mut() {
-        *cd = cd.saturating_sub(1);
+        *cd = cd.saturating_sub(cd_step);
     }
     for cd in state.event_cooldowns.values_mut() {
         *cd = cd.saturating_sub(1);
     }
     if state.imf_austerity_turns > 0 {
-        state.imf_austerity_turns -= 1;
+        state.imf_austerity_turns = if god_mode { 0 } else { state.imf_austerity_turns - 1 };
     }
     if state.regime.is_democratic() && !state.flags.term_limits_abolished {
         state.quarters_until_election = state.quarters_until_election.saturating_sub(1);
@@ -145,12 +159,13 @@ pub fn advance_quarter(state: &mut NationState) {
         + (state.approval / 22.0)
         + (state.legitimacy / 28.0)
         + if state.regime.is_authoritarian() { 2.5 } else { 0.0 }
+        + if god_mode { 35.0 } else { 0.0 }
         - if state.stability < 35.0 { 3.5 } else { 0.0 };
     state.political_capital = (state.political_capital + pc_gain).clamp(0.0, 100.0);
 
     // 2. Macroeconomics
-    let sanction_count = state.foreign_powers.iter().filter(|p| p.sanctioning_us).count() as f64;
-    let trade_pacts = state.foreign_powers.iter().filter(|p| p.trade_pact).count() as f64;
+    let sanction_count = state.foreign_powers.iter().filter(|p| p.sanctioning_us && !p.annexed).count() as f64;
+    let trade_pacts = state.foreign_powers.iter().filter(|p| p.trade_pact && !p.annexed).count() as f64;
     let active_wars = state.active_wars_count() as f64;
 
     let econ_growth_base = match state.economy {
@@ -168,18 +183,23 @@ pub fn advance_quarter(state: &mut NationState) {
     let human_cap_boost = (state.education_level + state.infrastructure_level + state.tech_level - 160.0) * 0.018;
     let corruption_drag = state.corruption * 0.032;
     let stability_effect = (state.stability - 50.0) * 0.038;
-    let trade_effect = trade_pacts * 0.55 - sanction_count * 1.45 - active_wars * 2.1;
+    let trade_effect = trade_pacts * 0.55 - sanction_count * 1.45 - active_wars * if god_mode { 0.0 } else { 2.1 };
     let five_year_boost = if state.flags.five_year_plan { 0.65 } else { 0.0 };
     let insurgency_drag = state.insurgency_strength * 0.045;
+    let god_growth_boost = if god_mode { 4.8 } else { 0.0 };
     let noise = (state.next_rand() - 0.5) * 0.8;
 
-    let target_growth = (econ_growth_base + human_cap_boost + stability_effect + trade_effect + five_year_boost
+    let raw_target_growth = econ_growth_base + human_cap_boost + stability_effect + trade_effect + five_year_boost + god_growth_boost
         - tax_drag
         - rate_drag
         - corruption_drag
         - insurgency_drag
-        + noise)
-        .clamp(-12.0, 11.5);
+        + noise;
+    let target_growth = if god_mode {
+        raw_target_growth.clamp(4.5, 16.0)
+    } else {
+        raw_target_growth.clamp(-12.0, 11.5)
+    };
 
     state.gdp_growth = state.gdp_growth * 0.55 + target_growth * 0.45;
     state.gdp_bn = (state.gdp_bn * (1.0 + state.gdp_growth / 400.0)).max(25.0);
@@ -208,6 +228,9 @@ pub fn advance_quarter(state: &mut NationState) {
         + (state.gdp_growth - 3.0).max(0.0) * 0.35)
         .clamp(0.4, 48.0);
     state.inflation = (state.inflation * 0.72 + target_inflation * 0.28).clamp(0.2, 60.0);
+    if god_mode {
+        state.inflation = state.inflation.min(2.2);
+    }
 
     // Unemployment
     let target_unemp = (7.2
@@ -218,6 +241,9 @@ pub fn advance_quarter(state: &mut NationState) {
         + sanction_count * 0.9)
         .clamp(1.2, 34.0);
     state.unemployment = state.unemployment * 0.7 + target_unemp * 0.3;
+    if god_mode {
+        state.unemployment = state.unemployment.min(2.4);
+    }
 
     // Inequality (Gini)
     let gini_target = (42.0
@@ -250,6 +276,9 @@ pub fn advance_quarter(state: &mut NationState) {
         + state.taxes.state_ownership * 0.08)
         .clamp(5.0, 92.0);
     state.corruption = drift(state.corruption, corr_target, 0.06);
+    if god_mode {
+        state.corruption = state.corruption.min(6.0);
+    }
 
     let rol_target = (50.0
         + if state.flags.independent_judiciary { 22.0 } else { -12.0 }
@@ -327,6 +356,12 @@ pub fn advance_quarter(state: &mut NationState) {
         - if state.flags.mass_surveillance { 0.9 } else { 0.0 }
         - if state.flags.martial_law { 0.7 } else { 0.0 };
     state.insurgency_strength = (state.insurgency_strength + ins_delta).clamp(0.0, 100.0);
+    if god_mode {
+        state.religious_extremism = (state.religious_extremism - 6.0).max(0.0);
+        state.ideological_extremism = (state.ideological_extremism - 6.0).max(0.0);
+        state.sectarian_tension = (state.sectarian_tension - 6.0).max(0.0);
+        state.insurgency_strength = (state.insurgency_strength - 8.0).max(0.0);
+    }
 
     // 5. Military Readiness, Troops & Nuclear Program
     let target_troops = state.population_m
@@ -338,11 +373,23 @@ pub fn advance_quarter(state: &mut NationState) {
             DefensePosture::PowerProjection => 1.25,
             DefensePosture::FullMobilization => 1.7,
         };
-    state.active_troops_k = drift(state.active_troops_k, target_troops.clamp(20.0, 1800.0), 0.14);
+    let troop_cap = (state.population_m * 45.0).max(1800.0);
+    state.active_troops_k = drift(state.active_troops_k, target_troops.clamp(20.0, troop_cap), 0.14);
+    if god_mode {
+        state.active_troops_k = state.active_troops_k.max(850.0);
+    }
 
-    let readiness_target = (state.budget.military * 0.75 + state.military_tech * 0.25 - state.war_exhaustion * 0.35).clamp(15.0, 100.0);
-    state.military_readiness = drift(state.military_readiness, readiness_target, 0.12);
-    state.military_tech = drift(state.military_tech, state.tech_level * 0.6 + state.budget.military * 0.45, 0.05);
+    let readiness_target = if god_mode {
+        100.0
+    } else {
+        (state.budget.military * 0.75 + state.military_tech * 0.25 - state.war_exhaustion * 0.35).clamp(15.0, 100.0)
+    };
+    state.military_readiness = drift(state.military_readiness, readiness_target, if god_mode { 0.40 } else { 0.12 });
+    state.military_tech = drift(
+        state.military_tech,
+        if god_mode { 100.0 } else { state.tech_level * 0.6 + state.budget.military * 0.45 },
+        if god_mode { 0.35 } else { 0.05 },
+    );
 
     if state.nuclear_status != NuclearStatus::None && state.nuclear_status != NuclearStatus::StrategicTriad {
         state.nuclear_progress += (state.budget.research * 0.05 + state.tech_level * 0.03).max(1.0);
@@ -374,8 +421,12 @@ pub fn advance_quarter(state: &mut NationState) {
 
     let econ_mood = 52.0 + state.gdp_growth * 3.8 - state.inflation * 1.4 - state.unemployment * 1.3
         + (state.healthcare_level + state.education_level - 110.0) * 0.22;
-    let approval_target = (weighted_faction_app * 0.52 + econ_mood * 0.48 - state.war_exhaustion * 0.32 - state.corruption * 0.18).clamp(4.0, 96.0);
+    let god_mood_bonus = if god_mode { 18.0 } else { 0.0 };
+    let approval_target = (weighted_faction_app * 0.52 + econ_mood * 0.48 - state.war_exhaustion * 0.32 - state.corruption * 0.18 + god_mood_bonus).clamp(4.0, 99.0);
     state.approval = drift(state.approval, approval_target, 0.22);
+    if god_mode {
+        state.approval = state.approval.max(85.0);
+    }
 
     let stability_target = (50.0
         + (state.approval - 50.0) * 0.48
@@ -383,15 +434,23 @@ pub fn advance_quarter(state: &mut NationState) {
         - state.insurgency_strength * 0.45
         - state.total_extremism() * 0.28
         - state.war_exhaustion * 0.30
-        + if state.flags.secret_police { 4.0 } else { 0.0 })
-        .clamp(2.0, 98.0);
+        + if state.flags.secret_police { 4.0 } else { 0.0 }
+        + god_mood_bonus)
+        .clamp(2.0, 99.0);
     state.stability = drift(state.stability, stability_target, 0.20);
+    if god_mode {
+        state.stability = state.stability.max(88.0);
+    }
 
     let legit_target = (state.approval * 0.45
         + state.rule_of_law * 0.25
-        + if state.regime.is_democratic() { state.democracy_index * 0.30 } else { state.stability * 0.30 })
-        .clamp(5.0, 98.0);
+        + if state.regime.is_democratic() { state.democracy_index * 0.30 } else { state.stability * 0.30 }
+        + god_mood_bonus * 0.7)
+        .clamp(5.0, 99.0);
     state.legitimacy = drift(state.legitimacy, legit_target, 0.15);
+    if god_mode {
+        state.legitimacy = state.legitimacy.max(88.0);
+    }
 
     state.coup_risk = calculate_coup_risk(state);
     state.credit_rating = compute_credit_rating(state);
@@ -407,16 +466,46 @@ pub fn advance_quarter(state: &mut NationState) {
 }
 
 fn update_foreign_powers_and_wars(state: &mut NationState) {
-    let my_power = (state.active_troops_k * 0.12 + state.military_readiness * 0.45 + state.military_tech * 0.45)
-        * if state.nuclear_status.stage() >= 3 { 1.35 } else { 1.0 };
+    let god_mode = state.flags.ledger_rebalance;
+    let puppet_power: f64 = state
+        .foreign_powers
+        .iter()
+        .filter(|p| p.puppet_state && !p.annexed)
+        .map(|p| p.military_power * 0.18)
+        .sum();
+    let my_power = ((state.active_troops_k * 0.12 + state.military_readiness * 0.45 + state.military_tech * 0.45)
+        * if state.nuclear_status.stage() >= 3 { 1.35 } else { 1.0 }
+        + puppet_power)
+        * if god_mode { 2.25 } else { 1.0 };
     let dtg = state.debt_to_gdp();
     let infl = state.inflation;
 
     let mut any_war = false;
     let mut conquered_by: Option<String> = None;
+    let mut won_war_target: Option<ForeignPowerId> = None;
     let mut war_logs: Vec<(LogCategory, String, String)> = Vec::new();
 
     for p in &mut state.foreign_powers {
+        if p.annexed {
+            p.at_war = false;
+            p.sanctioning_us = false;
+            p.we_sanction_them = false;
+            p.trade_pact = false;
+            p.defense_alliance = false;
+            p.proxy_funding = false;
+            continue;
+        }
+
+        if p.puppet_state {
+            p.at_war = false;
+            p.sanctioning_us = false;
+            p.we_sanction_them = false;
+            p.trade_pact = true;
+            p.defense_alliance = true;
+            p.relation = drift(p.relation, 92.0, 0.20).clamp(50.0, 100.0);
+            continue;
+        }
+
         // Ideological diplomatic drift
         let ideo_drift = match p.id {
             ForeignPowerId::AtlanticRepublic => {
@@ -442,13 +531,18 @@ fn update_foreign_powers_and_wars(state: &mut NationState) {
         };
 
         if !p.at_war {
+            if god_mode {
+                p.sanctioning_us = false;
+            }
             let pact_bonus = if p.trade_pact { 0.6 } else { 0.0 } + if p.defense_alliance { 0.9 } else { 0.0 };
             let sanc_pen = if p.sanctioning_us || p.we_sanction_them { -1.0 } else { 0.0 };
             let proxy_pen = if p.proxy_funding { -2.2 } else { 0.0 };
-            p.relation = (p.relation + ideo_drift + pact_bonus + sanc_pen + proxy_pen).clamp(-100.0, 100.0);
+            let god_charm = if god_mode { 1.5 } else { 0.0 };
+            p.relation = (p.relation + ideo_drift + pact_bonus + sanc_pen + proxy_pen + god_charm).clamp(-100.0, 100.0);
 
-            // Auto sanctions if relations plummet with major blocs
-            if matches!(p.id, ForeignPowerId::AtlanticRepublic | ForeignPowerId::GlobalMonetaryCouncil)
+            // Auto sanctions if relations plummet with major blocs (suppressed in God Mode)
+            if !god_mode
+                && matches!(p.id, ForeignPowerId::AtlanticRepublic | ForeignPowerId::GlobalMonetaryCouncil)
                 && p.relation < -60.0
                 && !p.sanctioning_us
             {
@@ -462,26 +556,34 @@ fn update_foreign_powers_and_wars(state: &mut NationState) {
         } else {
             any_war = true;
             let enemy_power = p.military_power * 1.15;
-            let delta = ((my_power - enemy_power) * 0.24).clamp(-16.0, 16.0);
+            let delta = if god_mode {
+                ((my_power - enemy_power) * 0.30).clamp(12.0, 32.0)
+            } else {
+                ((my_power - enemy_power) * 0.24).clamp(-16.0, 16.0)
+            };
             p.war_score = (p.war_score + delta).clamp(-100.0, 100.0);
             if p.war_score >= 95.0 {
-                p.at_war = false;
-                p.relation = -35.0;
-                p.war_score = 0.0;
-                war_logs.push((
-                    LogCategory::Military,
-                    format!("Victory Over {}!", p.name),
-                    format!("Our armed forces forced {} to sign a favorable armistice and pay war reparations ($28B).", p.name),
-                ));
-                state.treasury_bn += 28.0;
-                state.approval = (state.approval + 12.0).min(100.0);
-            } else if p.war_score <= -95.0 {
+                p.war_score = 100.0;
+                if won_war_target.is_none() {
+                    won_war_target = Some(p.id);
+                    war_logs.push((
+                        LogCategory::Military,
+                        format!("Total Victory Over {}!", p.name),
+                        format!(
+                            "Our armed forces captured the capital of {}! Enemy command surrendered unconditionally; peace & annexation conference convened.",
+                            p.name
+                        ),
+                    ));
+                }
+            } else if p.war_score <= -95.0 && !god_mode {
                 conquered_by = Some(p.name.clone());
             }
         }
     }
 
-    if any_war {
+    if god_mode {
+        state.war_exhaustion = 0.0;
+    } else if any_war {
         state.war_exhaustion = (state.war_exhaustion + 4.5).min(100.0);
     } else {
         state.war_exhaustion = (state.war_exhaustion - 3.5).max(0.0);
@@ -496,6 +598,9 @@ fn update_foreign_powers_and_wars(state: &mut NationState) {
             "Our front lines collapsed against {}. Foreign forces occupied the capital of {} and dissolved your government.",
             enemy, state.nation_name
         )));
+    } else if let Some(target_id) = won_war_target {
+        state.pending_event_target = Some(target_id);
+        state.active_event = Some(crate::events::build_post_war_victory_event(state, target_id));
     }
 }
 
@@ -567,12 +672,20 @@ fn update_factions(state: &mut NationState) {
                     - if state.imf_austerity_turns > 0 { 12.0 } else { 0.0 }
             }
         };
-        f.approval = drift(f.approval, target_app.clamp(4.0, 96.0), 0.16);
+        let adjusted_target = if flags.ledger_rebalance {
+            (target_app + 24.0).clamp(80.0, 99.0)
+        } else {
+            target_app.clamp(4.0, 96.0)
+        };
+        f.approval = drift(f.approval, adjusted_target, if flags.ledger_rebalance { 0.30 } else { 0.16 });
+        if flags.ledger_rebalance {
+            f.approval = f.approval.max(78.0);
+        }
     }
 }
 
 fn check_end_states(state: &mut NationState) {
-    if state.game_over.is_some() {
+    if state.game_over.is_some() || state.flags.ledger_rebalance {
         return;
     }
 
@@ -601,7 +714,214 @@ fn check_end_states(state: &mut NationState) {
     }
 }
 
+pub fn annex_foreign_power(
+    state: &mut NationState,
+    target: ForeignPowerId,
+    peaceful: bool,
+) -> Result<String, String> {
+    if target == ForeignPowerId::GlobalMonetaryCouncil {
+        return Err("Cannot annex a multilateral financial council".into());
+    }
+    let (pname, econ_p, mil_p) = {
+        let p = state.foreign(target);
+        if p.annexed {
+            return Err(format!("{} is already annexed", p.name));
+        }
+        (p.name.clone(), p.economic_power, p.military_power)
+    };
+
+    let pop_gain = (econ_p * 0.28 + mil_p * 0.14).max(5.0);
+    let gdp_gain = (econ_p * 6.5).max(80.0);
+    let treasury_seized = (econ_p * 1.1).max(20.0);
+    let troops_gain = (mil_p * 1.4).max(15.0);
+    let tech_boost = if econ_p >= 70.0 { 8.0 } else { 3.5 };
+    let nation_name = state.nation_name.clone();
+    let god_mode = state.flags.ledger_rebalance;
+
+    {
+        let p = state.foreign_mut(target);
+        p.annexed = true;
+        p.puppet_state = false;
+        p.at_war = false;
+        p.war_score = 0.0;
+        p.sanctioning_us = false;
+        p.we_sanction_them = false;
+        p.trade_pact = false;
+        p.defense_alliance = false;
+        p.proxy_funding = false;
+        p.spy_network = false;
+        p.relation = 100.0;
+        p.military_power = 0.0;
+        p.economic_power = 0.0;
+        p.ideology = format!("Annexed Province of {}", nation_name);
+    }
+
+    state.population_m += pop_gain;
+    state.gdp_bn += gdp_gain;
+    state.treasury_bn += treasury_seized;
+    state.active_troops_k += troops_gain;
+    state.tech_level = (state.tech_level + tech_boost).min(100.0);
+    state.military_tech = (state.military_tech + tech_boost).min(100.0);
+    state.approval = (state.approval + 10.0).min(100.0);
+    state.legitimacy = (state.legitimacy + 6.0).min(100.0);
+    state.adjust_faction(FactionId::Nationalists, 18.0, 10.0);
+    state.adjust_faction(FactionId::Military, 14.0, 8.0);
+
+    if !state.annexed_territories.iter().any(|t| t == &pname) {
+        state.annexed_territories.push(pname.clone());
+    }
+
+    if peaceful || god_mode {
+        state.stability = (state.stability + 8.0).min(100.0);
+        state.war_exhaustion = 0.0;
+    } else {
+        state.insurgency_strength = (state.insurgency_strength + 12.0).min(100.0);
+        state.sectarian_tension = (state.sectarian_tension + 10.0).min(100.0);
+        state.war_exhaustion = (state.war_exhaustion - 15.0).max(0.0);
+        for other in &mut state.foreign_powers {
+            if other.id != target && !other.annexed && !other.puppet_state {
+                other.relation = (other.relation - 20.0).max(-100.0);
+                if matches!(
+                    other.id,
+                    ForeignPowerId::AtlanticRepublic | ForeignPowerId::GlobalMonetaryCouncil
+                ) && other.relation < -45.0
+                {
+                    other.sanctioning_us = true;
+                }
+            }
+        }
+    }
+
+    let msg = format!(
+        "Annexed {} into {}! (+{:.1}M Pop, +${:.0}B GDP, +${:.0}B Treasury, +{:.0}K Troops)",
+        pname, state.nation_name, pop_gain, gdp_gain, treasury_seized, troops_gain
+    );
+    state.log(LogCategory::Military, format!("ANNEXATION: {}", pname), &msg);
+
+    if state.is_global_hegemon() {
+        state.log(
+            LogCategory::Political,
+            "GLOBAL HEGEMONY ACHIEVED!",
+            format!(
+                "All rival sovereign powers have been annexed or brought under the banner of {}. History enters a new unipolar era.",
+                state.nation_name
+            ),
+        );
+    }
+
+    state.last_fiscal = calculate_fiscal(state);
+    state.coup_risk = calculate_coup_risk(state);
+    state.credit_rating = compute_credit_rating(state);
+    Ok(msg)
+}
+
+pub fn install_puppet_regime(
+    state: &mut NationState,
+    target: ForeignPowerId,
+) -> Result<String, String> {
+    if target == ForeignPowerId::GlobalMonetaryCouncil {
+        return Err("Cannot install a puppet regime on a multilateral financial council".into());
+    }
+    let (pname, econ_p) = {
+        let p = state.foreign(target);
+        if p.annexed {
+            return Err(format!("{} is already annexed", p.name));
+        }
+        (p.name.clone(), p.economic_power)
+    };
+
+    let nation_name = state.nation_name.clone();
+    let indemnity = 22.0 + econ_p * 0.45;
+    let tribute = econ_p * 0.22;
+    let god_mode = state.flags.ledger_rebalance;
+
+    {
+        let p = state.foreign_mut(target);
+        p.puppet_state = true;
+        p.at_war = false;
+        p.war_score = 0.0;
+        p.sanctioning_us = false;
+        p.we_sanction_them = false;
+        p.proxy_funding = false;
+        p.trade_pact = true;
+        p.defense_alliance = true;
+        p.relation = 90.0;
+        p.ideology = format!("Client State of {}", nation_name);
+    }
+
+    state.treasury_bn += indemnity;
+    state.approval = (state.approval + 8.0).min(100.0);
+    state.adjust_faction(FactionId::Nationalists, 10.0, 5.0);
+    state.adjust_faction(FactionId::Military, 10.0, 5.0);
+    if !god_mode {
+        state.insurgency_strength = (state.insurgency_strength + 3.0).min(100.0);
+        for other in &mut state.foreign_powers {
+            if other.id != target && !other.annexed && !other.puppet_state {
+                other.relation = (other.relation - 10.0).max(-100.0);
+            }
+        }
+    } else {
+        state.war_exhaustion = 0.0;
+    }
+
+    let msg = format!(
+        "Installed compliant client government in {} (+${:.0}B indemnity, +${:.1}B/qtr tribute, Trade & Defense Pacts locked).",
+        pname, indemnity, tribute
+    );
+    state.log(LogCategory::Diplomacy, format!("Client State: {}", pname), &msg);
+
+    if state.is_global_hegemon() {
+        state.log(
+            LogCategory::Political,
+            "GLOBAL HEGEMONY ACHIEVED!",
+            format!(
+                "All rival sovereign powers have been annexed or brought under the banner of {}. History enters a new unipolar era.",
+                state.nation_name
+            ),
+        );
+    }
+
+    state.last_fiscal = calculate_fiscal(state);
+    state.coup_risk = calculate_coup_risk(state);
+    state.credit_rating = compute_credit_rating(state);
+    Ok(msg)
+}
+
+pub fn impose_war_reparations(
+    state: &mut NationState,
+    target: ForeignPowerId,
+) -> Result<String, String> {
+    let (pname, econ_p) = {
+        let p = state.foreign(target);
+        if p.annexed {
+            return Err(format!("{} is already annexed", p.name));
+        }
+        (p.name.clone(), p.economic_power)
+    };
+    let reparations = 28.0 + econ_p * 0.45;
+    {
+        let p = state.foreign_mut(target);
+        p.at_war = false;
+        p.war_score = 0.0;
+        p.relation = -35.0;
+        p.military_power = (p.military_power * 0.65).max(15.0);
+    }
+    state.treasury_bn += reparations;
+    state.approval = (state.approval + 12.0).min(100.0);
+    state.war_exhaustion = (state.war_exhaustion - 20.0).max(0.0);
+    let msg = format!(
+        "Imposed armistice and demilitarization on {} (+${:.0}B war reparations, enemy military slashed 35%).",
+        pname, reparations
+    );
+    state.log(LogCategory::Military, format!("Victory Treaty: {}", pname), &msg);
+    state.last_fiscal = calculate_fiscal(state);
+    state.coup_risk = calculate_coup_risk(state);
+    state.credit_rating = compute_credit_rating(state);
+    Ok(msg)
+}
+
 pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action: &str) -> Result<String, String> {
+    let god_mode = state.flags.ledger_rebalance;
     let pc_cost = match action {
         "improve" => 6.0,
         "trade_pact" => 12.0,
@@ -611,11 +931,17 @@ pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action
         "fund_proxies" => 16.0,
         "declare_war" => 20.0,
         "sue_peace" => 12.0,
+        "annex_country" => if god_mode { 10.0 } else { 24.0 },
+        "install_puppet" => if god_mode { 8.0 } else { 18.0 },
         _ => 10.0,
     };
 
     if state.political_capital < pc_cost {
         return Err(format!("Need {:.0} Political Capital", pc_cost));
+    }
+
+    if state.foreign(target).annexed {
+        return Err("Territory is already annexed into your nation".into());
     }
 
     let p = state.foreign_mut(target);
@@ -734,6 +1060,9 @@ pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action
             if p.at_war {
                 return Err("Already at war".into());
             }
+            if p.puppet_state {
+                return Err("Already a client state — use Annex Client State directly".into());
+            }
             if target == ForeignPowerId::GlobalMonetaryCouncil {
                 return Err("Cannot declare conventional war on a multilateral financial council".into());
             }
@@ -758,6 +1087,9 @@ pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action
             p.war_score = 0.0;
             p.relation = -45.0;
             state.political_capital -= pc_cost;
+            if state.pending_event_target == Some(target) {
+                state.pending_event_target = None;
+            }
             let msg = if ws >= 0.0 {
                 state.treasury_bn += 10.0;
                 format!("Negotiated peace from a position of strength with {} (+$10B reparations).", pname)
@@ -769,19 +1101,96 @@ pub fn diplomatic_action(state: &mut NationState, target: ForeignPowerId, action
             state.log(LogCategory::Diplomacy, format!("Peace Treaty: {}", pname), &msg);
             Ok(msg)
         }
+        "annex_country" => {
+            if target == ForeignPowerId::GlobalMonetaryCouncil {
+                return Err("Cannot annex a multilateral financial council".into());
+            }
+            let is_puppet = p.puppet_state;
+            let can_annex = is_puppet || (p.at_war && p.war_score >= 70.0);
+            if !can_annex {
+                return Err("Requires War Score >= +70 (or Client State status) to annex".into());
+            }
+            state.political_capital -= pc_cost;
+            if state.pending_event_target == Some(target) {
+                state.pending_event_target = None;
+            }
+            annex_foreign_power(state, target, is_puppet)
+        }
+        "install_puppet" => {
+            if target == ForeignPowerId::GlobalMonetaryCouncil {
+                return Err("Cannot install a puppet regime on a multilateral financial council".into());
+            }
+            if !p.at_war || p.war_score < 65.0 {
+                return Err("Requires active war with War Score >= +65 to install client regime".into());
+            }
+            state.political_capital -= pc_cost;
+            if state.pending_event_target == Some(target) {
+                state.pending_event_target = None;
+            }
+            install_puppet_regime(state, target)
+        }
         _ => Err("Unknown action".into()),
     }
 }
 
 pub fn rebalance_sovereign_ledger(state: &mut NationState) {
+    let was_active = state.flags.ledger_rebalance;
     state.national_debt_bn = 0.0;
     state.imf_austerity_turns = 0;
     state.flags.ledger_rebalance = true;
     state.treasury_bn += 1000.0;
     state.gdp_bn += 1000.0;
-    state.inflation = state.inflation.min(2.0);
+    state.gdp_growth = state.gdp_growth.max(8.5);
+    state.inflation = state.inflation.min(1.5);
+    state.unemployment = state.unemployment.min(2.0);
+    state.political_capital = 100.0;
+
+    // Governance, Stability & Development Apex
+    state.approval = state.approval.max(92.0);
+    state.stability = state.stability.max(94.0);
+    state.legitimacy = state.legitimacy.max(95.0);
+    state.rule_of_law = state.rule_of_law.max(90.0);
+    state.corruption = state.corruption.min(5.0);
+    state.education_level = state.education_level.max(92.0);
+    state.healthcare_level = state.healthcare_level.max(92.0);
+    state.infrastructure_level = state.infrastructure_level.max(92.0);
+    state.tech_level = state.tech_level.max(95.0);
+
+    // Zero Extremism, Coup Immunity & Military Supremacy
+    state.religious_extremism = state.religious_extremism.min(3.0);
+    state.ideological_extremism = state.ideological_extremism.min(3.0);
+    state.sectarian_tension = state.sectarian_tension.min(4.0);
+    state.insurgency_strength = 0.0;
+    state.war_exhaustion = 0.0;
+    state.coup_risk = 0.0;
+    state.military_readiness = 100.0;
+    state.military_tech = 100.0;
+    state.active_troops_k = state.active_troops_k.max(850.0);
+    state.nuclear_status = NuclearStatus::StrategicTriad;
+    state.nuclear_progress = 100.0;
+
+    // Domestic Faction Loyalty & Sanctions Relief
+    for f in &mut state.factions {
+        f.approval = f.approval.max(88.0);
+    }
+    for p in &mut state.foreign_powers {
+        if !p.annexed && !p.at_war {
+            p.sanctioning_us = false;
+            p.relation = (p.relation + 15.0).min(100.0);
+        }
+    }
+
     state.last_fiscal = calculate_fiscal(state);
     state.credit_rating = compute_credit_rating(state);
+    state.coup_risk = calculate_coup_risk(state);
+
+    if !was_active {
+        state.log(
+            LogCategory::Political,
+            "Sovereign Golden Mandate Activated",
+            "Sovereign debt wiped, +$1.00T surplus locked, Strategic Triad armed, domestic factions united, and Golden Age incidents unlocked.",
+        );
+    }
 }
 
 fn drift(current: f64, target: f64, speed: f64) -> f64 {
@@ -854,5 +1263,99 @@ mod tests {
         assert_eq!(state.active_wars_count(), 1);
         assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "sue_peace").is_ok());
         assert_eq!(state.active_wars_count(), 0);
+    }
+
+    #[test]
+    fn war_victory_triggers_conquest_conference_and_annexation() {
+        let mut state = NationState::from_preset(ScenarioPreset::SolariaDictatorship);
+        state.political_capital = 80.0;
+        state.active_troops_k = 600.0;
+        state.military_readiness = 95.0;
+        state.military_tech = 90.0;
+
+        let init_gdp = state.gdp_bn;
+        let init_pop = state.population_m;
+
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "declare_war").is_ok());
+        state.foreign_mut(ForeignPowerId::BorderlandRepublic).war_score = 92.0;
+
+        advance_quarter(&mut state);
+        let ev = state.active_event.as_ref().expect("post_war_victory event should trigger");
+        assert_eq!(ev.id, "post_war_victory");
+
+        crate::events::resolve_event_choice(&mut state, "annex_territory");
+        let borderland = state.foreign(ForeignPowerId::BorderlandRepublic);
+        assert!(borderland.annexed);
+        assert!(!borderland.at_war);
+        assert_eq!(state.annexed_count(), 1);
+        assert!(state.gdp_bn > init_gdp + 100.0);
+        assert!(state.population_m > init_pop + 10.0);
+        // Further diplomatic actions on annexed territory are rejected
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "declare_war").is_err());
+    }
+
+    #[test]
+    fn direct_puppet_and_subsequent_annexation_work() {
+        let mut state = NationState::from_preset(ScenarioPreset::AureliaDemocracy);
+        state.political_capital = 100.0;
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "declare_war").is_ok());
+        // Cannot annex before war_score >= 70
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "annex_country").is_err());
+
+        state.foreign_mut(ForeignPowerId::BorderlandRepublic).war_score = 72.0;
+        let fiscal_before = calculate_fiscal(&state);
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "install_puppet").is_ok());
+        assert!(state.foreign(ForeignPowerId::BorderlandRepublic).puppet_state);
+        assert_eq!(state.puppet_count(), 1);
+        let fiscal_after = calculate_fiscal(&state);
+        assert!(fiscal_after.soe_rev > fiscal_before.soe_rev);
+
+        // Now peacefully annex the puppet state
+        assert!(diplomatic_action(&mut state, ForeignPowerId::BorderlandRepublic, "annex_country").is_ok());
+        assert!(state.foreign(ForeignPowerId::BorderlandRepublic).annexed);
+        assert!(!state.foreign(ForeignPowerId::BorderlandRepublic).puppet_state);
+    }
+
+    #[test]
+    fn god_mode_boosts_player_and_triggers_favorable_incidents() {
+        let mut state = NationState::from_preset(ScenarioPreset::SolariaDictatorship);
+        rebalance_sovereign_ledger(&mut state);
+
+        assert!(state.flags.ledger_rebalance);
+        assert_eq!(state.national_debt_bn, 0.0);
+        assert_eq!(state.coup_risk, 0.0);
+        assert_eq!(state.credit_rating, "AAA");
+        assert_eq!(state.nuclear_status, NuclearStatus::StrategicTriad);
+        assert!(state.military_readiness >= 99.0);
+        assert!(state.military_tech >= 99.0);
+        assert!(state.factions.iter().all(|f| f.approval >= 85.0));
+
+        let mut saw_god_incident = false;
+        for _ in 0..20 {
+            if let Some(ev) = state.active_event.clone() {
+                assert!(
+                    ev.id.starts_with("god_") || ev.id == "national_election" || ev.id == "post_war_victory",
+                    "Unexpected negative crisis in god mode: {}",
+                    ev.id
+                );
+                if ev.id.starts_with("god_") {
+                    saw_god_incident = true;
+                }
+                let first_choice = ev.choices[0].id.clone();
+                crate::events::resolve_event_choice(&mut state, &first_choice);
+            }
+            advance_quarter(&mut state);
+            assert!(state.game_over.is_none());
+            assert_eq!(state.coup_risk, 0.0);
+        }
+        assert!(saw_god_incident, "Expected at least one player-favoring god mode incident");
+    }
+
+    #[test]
+    fn existing_save_file_deserializes_with_defaults() {
+        if let Ok(json) = std::fs::read_to_string("sovereign_save.json") {
+            let loaded: NationState = serde_json::from_str(&json).expect("legacy save should deserialize");
+            assert_eq!(loaded.annexed_count(), 0);
+        }
     }
 }

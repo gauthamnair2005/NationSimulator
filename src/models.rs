@@ -267,6 +267,16 @@ pub struct ForeignPower {
     pub war_score: f64, // -100..100
     pub proxy_funding: bool,
     pub spy_network: bool,
+    #[serde(default)]
+    pub annexed: bool,
+    #[serde(default)]
+    pub puppet_state: bool,
+}
+
+impl ForeignPower {
+    pub fn is_conquerable(&self) -> bool {
+        self.id != ForeignPowerId::GlobalMonetaryCouncil && !self.annexed
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -554,6 +564,10 @@ pub struct NationState {
     pub game_over: Option<GameOverReason>,
     pub last_fiscal: FiscalSummary,
     pub rng_state: u64,
+    #[serde(default)]
+    pub annexed_territories: Vec<String>,
+    #[serde(default)]
+    pub pending_event_target: Option<ForeignPowerId>,
 }
 
 impl NationState {
@@ -574,7 +588,25 @@ impl NationState {
     }
 
     pub fn active_wars_count(&self) -> usize {
-        self.foreign_powers.iter().filter(|f| f.at_war).count()
+        self.foreign_powers.iter().filter(|f| f.at_war && !f.annexed).count()
+    }
+
+    pub fn annexed_count(&self) -> usize {
+        self.foreign_powers.iter().filter(|f| f.annexed).count()
+    }
+
+    pub fn puppet_count(&self) -> usize {
+        self.foreign_powers
+            .iter()
+            .filter(|f| f.puppet_state && !f.annexed)
+            .count()
+    }
+
+    pub fn is_global_hegemon(&self) -> bool {
+        self.foreign_powers
+            .iter()
+            .filter(|f| f.id != ForeignPowerId::GlobalMonetaryCouncil)
+            .all(|f| f.annexed || f.puppet_state)
     }
 
     pub fn faction(&self, id: FactionId) -> &Faction {
@@ -595,6 +627,13 @@ impl NationState {
         let f = self.faction_mut(id);
         f.approval = (f.approval + approval_delta).clamp(0.0, 100.0);
         f.clout = (f.clout + clout_delta).clamp(5.0, 100.0);
+    }
+
+    pub fn foreign(&self, id: ForeignPowerId) -> &ForeignPower {
+        self.foreign_powers
+            .iter()
+            .find(|p| p.id == id)
+            .expect("foreign power must exist")
     }
 
     pub fn foreign_mut(&mut self, id: ForeignPowerId) -> &mut ForeignPower {
@@ -1077,6 +1116,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
             ForeignPower {
                 id: ForeignPowerId::PeoplesUnion,
@@ -1094,6 +1135,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
             ForeignPower {
                 id: ForeignPowerId::EurasianFederation,
@@ -1111,6 +1154,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
             ForeignPower {
                 id: ForeignPowerId::CrescentCoalition,
@@ -1128,6 +1173,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
             ForeignPower {
                 id: ForeignPowerId::BorderlandRepublic,
@@ -1145,6 +1192,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
             ForeignPower {
                 id: ForeignPowerId::GlobalMonetaryCouncil,
@@ -1162,6 +1211,8 @@ impl NationState {
                 war_score: 0.0,
                 proxy_funding: false,
                 spy_network: false,
+                annexed: false,
+                puppet_state: false,
             },
         ];
 
@@ -1244,6 +1295,8 @@ impl NationState {
             game_over: None,
             last_fiscal: FiscalSummary::default(),
             rng_state: 0xC0FFEE_2026_1120u64,
+            annexed_territories: Vec::new(),
+            pending_event_target: None,
         }
     }
 }

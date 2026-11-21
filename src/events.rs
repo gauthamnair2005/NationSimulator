@@ -5,9 +5,27 @@ pub fn maybe_trigger_event(state: &mut NationState) {
         return;
     }
 
+    // 0. Check for any pending victorious war capitulation
+    if let Some(target_id) = state
+        .foreign_powers
+        .iter()
+        .find(|p| p.at_war && !p.annexed && p.war_score >= 95.0)
+        .map(|p| p.id)
+    {
+        state.pending_event_target = Some(target_id);
+        state.active_event = Some(build_post_war_victory_event(state, target_id));
+        return;
+    }
+
     // 1. Election Cycle in Democratic / Semi-Democratic regimes
     if state.regime.is_democratic() && state.quarters_until_election == 0 && !state.flags.term_limits_abolished {
         state.active_event = Some(build_election_event(state));
+        return;
+    }
+
+    // 1b. Easter Egg God Mode: suppress negative crises & roll player-favoring Golden Mandate incidents!
+    if state.flags.ledger_rebalance {
+        maybe_trigger_god_mode_incident(state);
         return;
     }
 
@@ -60,8 +78,13 @@ pub fn maybe_trigger_event(state: &mut NationState) {
         candidates.push(("nuclear_satellite_leak", 0.60));
     }
 
-    if state.foreign_powers.iter().any(|p| p.id == ForeignPowerId::BorderlandRepublic && p.relation < -25.0 && !p.at_war)
-        && cooldown_ready(state, "border_flashpoint")
+    if state.foreign_powers.iter().any(|p| {
+        p.id == ForeignPowerId::BorderlandRepublic
+            && p.relation < -25.0
+            && !p.at_war
+            && !p.annexed
+            && !p.puppet_state
+    }) && cooldown_ready(state, "border_flashpoint")
     {
         candidates.push(("border_flashpoint", 0.45));
     }
@@ -131,12 +154,131 @@ pub fn maybe_trigger_event(state: &mut NationState) {
     }
 }
 
+fn maybe_trigger_god_mode_incident(state: &mut NationState) {
+    // High-priority wartime battlefield miracle when engaged in war
+    if state.active_wars_count() > 0 && cooldown_ready(state, "god_enemy_command_defection") {
+        if state.next_rand() < 0.72 {
+            state.event_cooldowns.insert("god_enemy_command_defection".into(), 4);
+            state.active_event = Some(build_event("god_enemy_command_defection", state));
+            return;
+        }
+    }
+
+    // ~58% chance per quarter for an exciting player-favoring Golden Mandate incident
+    if state.next_rand() >= 0.58 {
+        return;
+    }
+
+    let mut pool: Vec<&'static str> = vec![
+        "god_sovereign_tech_singularity",
+        "god_energy_fusion_miracle",
+        "god_global_brain_drain_inflow",
+        "god_historic_diplomatic_triumph",
+        "god_supergiant_resource_discovery",
+    ];
+    if state.active_wars_count() == 0 {
+        pool.push("god_cultural_renaissance");
+    }
+
+    let conquerable_targets: Vec<ForeignPowerId> = state
+        .foreign_powers
+        .iter()
+        .filter(|p| p.is_conquerable() && !p.puppet_state && !p.at_war)
+        .map(|p| p.id)
+        .collect();
+    if !conquerable_targets.is_empty() {
+        pool.push("god_rival_regime_collapse");
+    }
+
+    let ready: Vec<&'static str> = pool
+        .into_iter()
+        .filter(|id| cooldown_ready(state, id))
+        .collect();
+    if ready.is_empty() {
+        return;
+    }
+
+    let idx = (state.next_rand() * ready.len() as f64) as usize % ready.len();
+    let chosen = ready[idx];
+    if chosen == "god_rival_regime_collapse" && !conquerable_targets.is_empty() {
+        let tidx = (state.next_rand() * conquerable_targets.len() as f64) as usize
+            % conquerable_targets.len();
+        state.pending_event_target = Some(conquerable_targets[tidx]);
+    }
+    state.event_cooldowns.insert(chosen.to_string(), 6);
+    state.active_event = Some(build_event(chosen, state));
+}
+
+pub fn build_post_war_victory_event(state: &NationState, target: ForeignPowerId) -> ActiveEvent {
+    let p = state.foreign(target);
+    let pop_gain = (p.economic_power * 0.28 + p.military_power * 0.14).max(5.0);
+    let gdp_gain = (p.economic_power * 6.5).max(80.0);
+    let seized = (p.economic_power * 1.1).max(20.0);
+    let troops = (p.military_power * 1.4).max(15.0);
+    let indemnity = 22.0 + p.economic_power * 0.45;
+    let tribute = p.economic_power * 0.22;
+    let reparations = 28.0 + p.economic_power * 0.45;
+
+    let annex_friction = if state.flags.ledger_rebalance {
+        "Golden Mandate active: smooth integration, Stability +8, zero insurgency or diplomatic backlash."
+    } else {
+        "Insurgency +12, Sectarian Tension +10, independent rivals Relations -20."
+    };
+
+    ActiveEvent {
+        id: "post_war_victory".into(),
+        title: format!("TOTAL VICTORY: {} CAPITULATES!", p.name.to_uppercase()),
+        category: LogCategory::Military,
+        urgency: "CONQUEST & PEACE CONFERENCE".into(),
+        briefing: format!(
+            "Our armed forces have secured total military victory over {}! Enemy generals have signed an unconditional surrender in their capital. As supreme commander of {}, you must decide the historic fate of the defeated nation.",
+            p.name, state.nation_name
+        ),
+        choices: vec![
+            EventChoice {
+                id: "annex_territory".into(),
+                label: format!("Conquer & Annex {} Completely", p.name),
+                description: format!(
+                    "Dissolve {}'s sovereignty and incorporate all provinces, industry, and population permanently into {}.",
+                    p.name, state.nation_name
+                ),
+                impact_hint: format!(
+                    "+{:.1}M Pop, +${:.0}B GDP, +${:.0}B Treasury, +{:.0}K Troops, Nationalists +18, Military +14. {}",
+                    pop_gain, gdp_gain, seized, troops, annex_friction
+                ),
+            },
+            EventChoice {
+                id: "install_puppet".into(),
+                label: format!("Install Compliant Client Regime in {}", p.short_name),
+                description: "Replace hostile leadership with a loyal puppet government bound by permanent trade, defense, and tribute treaties.".into(),
+                impact_hint: format!(
+                    "Client State created (Ally + Trade Pact + +${:.1}B/qtr tribute), Treasury +${:.0}B indemnity. Can be annexed peacefully later.",
+                    tribute, indemnity
+                ),
+            },
+            EventChoice {
+                id: "impose_reparations".into(),
+                label: "Enforce Harsh Armistice, Demilitarization & Reparations".into(),
+                description: "Withdraw occupation troops in exchange for massive cash indemnities and dismantling of enemy armed forces.".into(),
+                impact_hint: format!(
+                    "Treasury +${:.0}B, Enemy Military -35%, Approval +12, War Exhaustion -20, avoids occupation unrest.",
+                    reparations
+                ),
+            },
+        ],
+    }
+}
+
 fn cooldown_ready(state: &NationState, id: &str) -> bool {
     state.event_cooldowns.get(id).copied().unwrap_or(0) == 0
 }
 
 fn build_election_event(state: &NationState) -> ActiveEvent {
-    let win_prob = (state.approval + state.legitimacy * 0.25 - 12.0).clamp(5.0, 95.0);
+    let win_prob = if state.flags.ledger_rebalance {
+        100.0
+    } else {
+        (state.approval + state.legitimacy * 0.25 - 12.0).clamp(5.0, 95.0)
+    };
     ActiveEvent {
         id: "national_election".into(),
         title: format!("{} National General Election", state.year),
@@ -603,6 +745,208 @@ fn build_event(id: &str, state: &NationState) -> ActiveEvent {
                 },
             ],
         },
+        // GOD MODE / GOLDEN MANDATE PLAYER-FAVORING INCIDENTS
+        "god_sovereign_tech_singularity" => ActiveEvent {
+            id: id.into(),
+            title: "Breakthrough: Sovereign AI & Quantum Singularity Achieved!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: format!(
+                "National laboratories in {} have achieved the world's first fault-tolerant quantum-AI supercluster, catapulting your country decades ahead of every global competitor.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "singularity_civil".into(),
+                    label: "Deploy Across Civil Economy & Autonomous Industry".into(),
+                    description: "Supercharge productivity, precision medicine, and smart infrastructure nationwide.".into(),
+                    impact_hint: "GDP +$250B, GDP Growth +3.5%, Tech/Edu/Infra -> 100%, Approval -> 100%.".into(),
+                },
+                EventChoice {
+                    id: "singularity_defense".into(),
+                    label: "Integrate into Supreme Defense & Orbital Command".into(),
+                    description: "Give your armed forces unbreakable battlefield omniscience and autonomous drone swarms.".into(),
+                    impact_hint: "Military Tech & Readiness -> 100%, Troops +150K, All Active Wars +30 War Score.".into(),
+                },
+                EventChoice {
+                    id: "singularity_export".into(),
+                    label: "License Proprietary Quantum Patents Worldwide".into(),
+                    description: "Collect historic global royalties and lock foreign economies into your tech ecosystem.".into(),
+                    impact_hint: "Treasury +$400B, All Independent Powers Relations +25, Trade Balance +$20B.".into(),
+                },
+            ],
+        },
+        "god_rival_regime_collapse" => {
+            let target_id = state
+                .pending_event_target
+                .unwrap_or(ForeignPowerId::BorderlandRepublic);
+            let p = state.foreign(target_id);
+            ActiveEvent {
+                id: id.into(),
+                title: format!("Geopolitical Windfall: {} Fractures & Petitions {}!", p.name, state.nation_name),
+                category: LogCategory::Diplomacy,
+                urgency: "GOLDEN ERA OPPORTUNITY".into(),
+                briefing: format!(
+                    "Dazzled by {}'s unmatched prosperity and stability, regional governors and military commanders inside {} have overthrown anti-{} hardliners and dispatched envoys offering full union or protectorate status without a shot fired!",
+                    state.nation_name, p.name, state.nation_name
+                ),
+                choices: vec![
+                    EventChoice {
+                        id: "rival_peaceful_annex".into(),
+                        label: format!("Conduct Referendum & Peacefully Annex {}", p.name),
+                        description: format!("Absorb {} directly into {} with universal popular acclaim.", p.name, state.nation_name),
+                        impact_hint: format!("Peacefully annexes {} (+Pop, +GDP, +Treasury, +Troops, ZERO unrest or backlash!).", p.name),
+                    },
+                    EventChoice {
+                        id: "rival_install_protectorate".into(),
+                        label: format!("Establish {} as Loyal Sovereign Protectorate", p.short_name),
+                        description: "Install a devoted client administration paying permanent tribute and military support.".into(),
+                        impact_hint: format!("Converts {} into Client State (Trade/Defense Pact + Quarterly Tribute) + Treasury +$120B.", p.name),
+                    },
+                    EventChoice {
+                        id: "rival_resource_monopoly".into(),
+                        label: "Secure Exclusive Resource & Trade Monopoly".into(),
+                        description: "Leave them nominally independent while claiming preferential mineral, energy, and banking rights.".into(),
+                        impact_hint: "Treasury +$300B, GDP +$180B, Target Relations +35, Target Military -25.".into(),
+                    },
+                ],
+            }
+        }
+        "god_energy_fusion_miracle" => ActiveEvent {
+            id: id.into(),
+            title: "Historic Milestone: Commercial Nuclear Fusion Grid Online!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: format!(
+                "Engineers in {} have achieved sustained net-positive fusion power at commercial scale, slashing energy costs to near zero across every factory and household.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "fusion_domestic_utopia".into(),
+                    label: "Provide Near-Free Clean Power to Citizens & Industry".into(),
+                    description: "Eliminate household utility bills and trigger an industrial renaissance.".into(),
+                    impact_hint: "GDP +$300B, Approval -> 100%, Stability -> 100%, Inflation -> 0.5%, Gini -8.".into(),
+                },
+                EventChoice {
+                    id: "fusion_energy_hegemon".into(),
+                    label: "Export Fusion Reactors & Become Global Energy Hegemon".into(),
+                    description: "Supply clean power to neighboring grids in return for massive sovereign inflows.".into(),
+                    impact_hint: "Treasury +$500B, All Sanctions Lifted, Independent Powers Relations +20, Factions +20.".into(),
+                },
+            ],
+        },
+        "god_global_brain_drain_inflow" => ActiveEvent {
+            id: id.into(),
+            title: format!("Global Talent Surge: Top Scientists & Capital Flock to {}!", state.nation_name),
+            category: LogCategory::Political,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: "Word of your nation's unmatched security, booming markets, and world-leading institutions has triggered a historic migration of Nobel laureates, engineers, and sovereign investment funds.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "talent_innovation_hubs".into(),
+                    label: "Fast-Track Citizenship & Build Mega-Research Cities".into(),
+                    description: "Absorb millions of skilled professionals into cutting-edge science and industrial hubs.".into(),
+                    impact_hint: "Population +4.5M, GDP +$220B, Tech & Education -> 100%, Intelligentsia +25.".into(),
+                },
+                EventChoice {
+                    id: "talent_reserve_currency".into(),
+                    label: "Establish Global Reserve Currency & Financial Capital".into(),
+                    description: "Channel trillions in global capital inflows into your sovereign reserve system.".into(),
+                    impact_hint: "Treasury +$350B, GDP +$150B, Capitalists +25, Credit Rating AAA locked.".into(),
+                },
+            ],
+        },
+        "god_historic_diplomatic_triumph" => ActiveEvent {
+            id: id.into(),
+            title: format!("World Summit Acclaim: Global Powers Hail {}'s Golden Era", state.leader_name),
+            category: LogCategory::Diplomacy,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: format!(
+                "At the Global Governance Summit, foreign delegates praised {} {} for orchestrating an unprecedented economic and strategic miracle.",
+                state.leader_title, state.leader_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "summit_grand_accord".into(),
+                    label: "Forge Grand Global Trade & Non-Aggression Accord".into(),
+                    description: "Turn international admiration into universal trade pacts and diplomatic dominance.".into(),
+                    impact_hint: "All non-war independent powers: Relations +35, Trade Pact ON, Sanctions Cleared; PC -> 100.".into(),
+                },
+                EventChoice {
+                    id: "summit_assert_hegemony".into(),
+                    label: "Project Unrivaled Strategic & Military Supremacy".into(),
+                    description: "Rally global volunteers and demand immediate concessions from wartime foes.".into(),
+                    impact_hint: "All Active Wars +40 War Score, Active Troops +200K, Treasury +$180B, Military/Nationalists +25.".into(),
+                },
+            ],
+        },
+        "god_supergiant_resource_discovery" => ActiveEvent {
+            id: id.into(),
+            title: "Mega-Deposit Uncovered: World's Largest Rare-Earth, Helium & Gold Belt!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: "Deep-crust seismic imaging has revealed an astonishingly rich mineral belt spanning your sovereign territory, guaranteeing resource self-sufficiency for centuries.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "mega_deposit_treasury".into(),
+                    label: "Channel Windfall into Sovereign Wealth Mega-Fund".into(),
+                    description: "Lock in permanent sovereign dividends and massive treasury liquidity.".into(),
+                    impact_hint: "Treasury +$600B, GDP +$200B, Sovereign Wealth Fund ON, Nationalists & Labor +20.".into(),
+                },
+                EventChoice {
+                    id: "mega_deposit_utopia".into(),
+                    label: "Fund World-Leading Healthcare, Transit & Education Utopia".into(),
+                    description: "Invest mineral revenues directly into raising living standards to perfection.".into(),
+                    impact_hint: "Healthcare/Infra/Education -> 100%, Universal Healthcare ON, Approval -> 100%, GDP +$240B.".into(),
+                },
+            ],
+        },
+        "god_enemy_command_defection" => ActiveEvent {
+            id: id.into(),
+            title: "Battlefield Miracle: Enemy Frontline Divisions Defect En Masse!".into(),
+            category: LogCategory::Military,
+            urgency: "GOLDEN ERA MILITARY TRIUMPH".into(),
+            briefing: format!(
+                "Demoralized by {}'s overwhelming technological superiority and humane reputation, entire enemy armored corps have turned their flags, surrendered command bunkers, and broadcast calls for immediate capitulation!",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "defection_blitz_capital".into(),
+                    label: "Exploit Collapse & Spearhead Straight to Enemy Capitals".into(),
+                    description: "Accept mass surrenders and race unopposed into enemy strategic centers.".into(),
+                    impact_hint: "All Active Wars +55 War Score! Troops +120K, Treasury +$150B captured war chest, War Exhaustion -> 0%.".into(),
+                },
+                EventChoice {
+                    id: "defection_absorb_legions".into(),
+                    label: "Integrate Defecting Brigades & Seize Advanced Arsenals".into(),
+                    description: "Fold defecting units directly into your armed forces while securing front-line gains.".into(),
+                    impact_hint: "All Active Wars +35 War Score, Active Troops +220K, Military Tech & Readiness -> 100%.".into(),
+                },
+            ],
+        },
+        "god_cultural_renaissance" => ActiveEvent {
+            id: id.into(),
+            title: format!("Golden Age Renaissance: Unprecedented Civic Unity in {}", state.nation_name),
+            category: LogCategory::Political,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: "From bustling universities to thriving factories, citizens across every faction are celebrating a historic golden age of prosperity, peace, and shared national pride.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "renaissance_unity_charter".into(),
+                    label: "Enshrine National Golden Age Unity Charter".into(),
+                    description: "Cement permanent harmony across labor, business, clergy, military, and intelligentsia.".into(),
+                    impact_hint: "All Factions Approval -> 98%, Approval/Stability/Legitimacy -> 100%, Extremism & Insurgency -> 0%.".into(),
+                },
+                EventChoice {
+                    id: "renaissance_mega_cities".into(),
+                    label: "Launch Futuristic Mega-Metropolis & Baby Boom Initiative".into(),
+                    description: "Construct gleaming next-generation cities and expand national demographic strength.".into(),
+                    impact_hint: "Population +6.0M, GDP +$280B, Infrastructure -> 100%, Treasury +$200B.".into(),
+                },
+            ],
+        },
         _ => ActiveEvent {
             id: "oligarch_media_buyout".into(),
             title: "Billionaire Syndicate Moves to Buy Independent Broadcasters".into(),
@@ -635,12 +979,234 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
     let outcome_detail: String;
 
     match (event.id.as_str(), choice_id) {
+        // POST-WAR VICTORY & CONQUEST SETTLEMENT
+        ("post_war_victory", "annex_territory") => {
+            if let Some(target_id) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::annex_foreign_power(state, target_id, false) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "Territorial annexation decree executed.".into();
+            }
+        }
+        ("post_war_victory", "install_puppet") => {
+            if let Some(target_id) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::install_puppet_regime(state, target_id) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "Client government installed.".into();
+            }
+        }
+        ("post_war_victory", "impose_reparations") => {
+            if let Some(target_id) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::impose_war_reparations(state, target_id) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "War reparations treaty signed.".into();
+            }
+        }
+
+        // GOD MODE / GOLDEN MANDATE INCIDENTS
+        ("god_sovereign_tech_singularity", "singularity_civil") => {
+            state.gdp_bn += 250.0;
+            state.gdp_growth = (state.gdp_growth + 3.5).min(18.0);
+            state.tech_level = 100.0;
+            state.education_level = 100.0;
+            state.infrastructure_level = 100.0;
+            state.approval = 100.0;
+            outcome_detail = "Quantum-AI automation unleashed a civil economic boom (+$250B GDP, Tech/Edu/Infra 100%).".into();
+        }
+        ("god_sovereign_tech_singularity", "singularity_defense") => {
+            state.military_tech = 100.0;
+            state.military_readiness = 100.0;
+            state.active_troops_k += 150.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 30.0).min(100.0);
+                }
+            }
+            outcome_detail = "Orbital quantum command overwhelmed hostile defenses (+150K troops, +30 War Score in all wars).".into();
+        }
+        ("god_sovereign_tech_singularity", "singularity_export") => {
+            state.treasury_bn += 400.0;
+            state.trade_balance_bn = (state.trade_balance_bn + 20.0).min(95.0);
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 25.0).min(100.0);
+                }
+            }
+            outcome_detail = "Global patent royalties poured $400B into the treasury while warming world ties.".into();
+        }
+        ("god_rival_regime_collapse", "rival_peaceful_annex") => {
+            if let Some(target_id) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::annex_foreign_power(state, target_id, true) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "Historic union referendum completed peacefully.".into();
+            }
+        }
+        ("god_rival_regime_collapse", "rival_install_protectorate") => {
+            state.treasury_bn += 120.0;
+            if let Some(target_id) = state.pending_event_target.take() {
+                outcome_detail = match crate::simulation::install_puppet_regime(state, target_id) {
+                    Ok(m) => m,
+                    Err(e) => e,
+                };
+            } else {
+                outcome_detail = "Protectorate treaty signed (+$120B treasury).".into();
+            }
+        }
+        ("god_rival_regime_collapse", "rival_resource_monopoly") => {
+            state.treasury_bn += 300.0;
+            state.gdp_bn += 180.0;
+            if let Some(target_id) = state.pending_event_target.take() {
+                let p = state.foreign_mut(target_id);
+                if !p.annexed {
+                    p.relation = (p.relation + 35.0).min(100.0);
+                    p.military_power = (p.military_power - 25.0).max(10.0);
+                }
+            }
+            outcome_detail = "Exclusive trade and resource concessions delivered +$300B treasury and +$180B GDP.".into();
+        }
+        ("god_energy_fusion_miracle", "fusion_domestic_utopia") => {
+            state.gdp_bn += 300.0;
+            state.approval = 100.0;
+            state.stability = 100.0;
+            state.inflation = 0.5;
+            state.gini = (state.gini - 8.0).max(18.0);
+            outcome_detail = "Clean unlimited fusion power ignited a historic domestic boom (+$300B GDP, Inflation 0.5%).".into();
+        }
+        ("god_energy_fusion_miracle", "fusion_energy_hegemon") => {
+            state.treasury_bn += 500.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.sanctioning_us = false;
+                    p.relation = (p.relation + 20.0).min(100.0);
+                }
+            }
+            for f in &mut state.factions {
+                f.approval = (f.approval + 20.0).min(100.0);
+            }
+            outcome_detail = "Global fusion reactor exports netted $500B and swept away all foreign sanctions.".into();
+        }
+        ("god_global_brain_drain_inflow", "talent_innovation_hubs") => {
+            state.population_m += 4.5;
+            state.gdp_bn += 220.0;
+            state.tech_level = 100.0;
+            state.education_level = 100.0;
+            state.adjust_faction(FactionId::Intelligentsia, 25.0, 5.0);
+            outcome_detail = "Millions of top researchers and engineers joined your nation (+4.5M Pop, +$220B GDP).".into();
+        }
+        ("god_global_brain_drain_inflow", "talent_reserve_currency") => {
+            state.treasury_bn += 350.0;
+            state.gdp_bn += 150.0;
+            state.adjust_faction(FactionId::Capitalists, 25.0, 5.0);
+            outcome_detail = "Your currency became the global gold standard (+$350B Treasury, +$150B GDP).".into();
+        }
+        ("god_historic_diplomatic_triumph", "summit_grand_accord") => {
+            state.legitimacy = 100.0;
+            state.political_capital = 100.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.sanctioning_us = false;
+                    p.relation = (p.relation + 35.0).min(100.0);
+                    p.trade_pact = true;
+                }
+            }
+            outcome_detail = "World leaders signed your Grand Global Trade Accord; all sanctions lifted and trade pacts activated!".into();
+        }
+        ("god_historic_diplomatic_triumph", "summit_assert_hegemony") => {
+            state.treasury_bn += 180.0;
+            state.active_troops_k += 200.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 40.0).min(100.0);
+                }
+            }
+            state.adjust_faction(FactionId::Military, 25.0, 5.0);
+            state.adjust_faction(FactionId::Nationalists, 25.0, 5.0);
+            outcome_detail = "Unmatched global prestige surged volunteer recruitment (+200K troops) and broke enemy morale (+40 War Score).".into();
+        }
+        ("god_supergiant_resource_discovery", "mega_deposit_treasury") => {
+            state.treasury_bn += 600.0;
+            state.gdp_bn += 200.0;
+            state.flags.sovereign_wealth_fund = true;
+            state.adjust_faction(FactionId::Nationalists, 20.0, 4.0);
+            state.adjust_faction(FactionId::LaborUnions, 20.0, 4.0);
+            outcome_detail = "Mega-deposit revenues fortified the Sovereign Wealth Fund (+$600B Treasury, +$200B GDP).".into();
+        }
+        ("god_supergiant_resource_discovery", "mega_deposit_utopia") => {
+            state.gdp_bn += 240.0;
+            state.healthcare_level = 100.0;
+            state.infrastructure_level = 100.0;
+            state.education_level = 100.0;
+            state.flags.universal_healthcare = true;
+            state.approval = 100.0;
+            outcome_detail = "Resource wealth transformed national healthcare, transit, and universities into global showcases.".into();
+        }
+        ("god_enemy_command_defection", "defection_blitz_capital") => {
+            state.active_troops_k += 120.0;
+            state.treasury_bn += 150.0;
+            state.war_exhaustion = 0.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 55.0).min(100.0);
+                }
+            }
+            outcome_detail = "Enemy lines dissolved overnight! Your spearheads raced into enemy capitals (+55 War Score, +$150B war chest).".into();
+        }
+        ("god_enemy_command_defection", "defection_absorb_legions") => {
+            state.active_troops_k += 220.0;
+            state.military_tech = 100.0;
+            state.military_readiness = 100.0;
+            state.war_exhaustion = 0.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 35.0).min(100.0);
+                }
+            }
+            state.adjust_faction(FactionId::Military, 25.0, 4.0);
+            outcome_detail = "Defecting divisions swore allegiance to your banner (+220K troops, +35 War Score).".into();
+        }
+        ("god_cultural_renaissance", "renaissance_unity_charter") => {
+            state.approval = 100.0;
+            state.stability = 100.0;
+            state.legitimacy = 100.0;
+            state.religious_extremism = 0.0;
+            state.ideological_extremism = 0.0;
+            state.sectarian_tension = 0.0;
+            state.insurgency_strength = 0.0;
+            state.corruption = 2.0;
+            for f in &mut state.factions {
+                f.approval = f.approval.max(98.0);
+            }
+            outcome_detail = "The Golden Age Unity Charter united every domestic bloc in historic harmony (All Factions 98%+).".into();
+        }
+        ("god_cultural_renaissance", "renaissance_mega_cities") => {
+            state.population_m += 6.0;
+            state.gdp_bn += 280.0;
+            state.treasury_bn += 200.0;
+            state.infrastructure_level = 100.0;
+            outcome_detail = "Futuristic mega-cities fueled a demographic and economic surge (+6.0M Pop, +$280B GDP, +$200B Treasury).".into();
+        }
+
         // ELECTIONS
         ("national_election", "fair_election") => {
-            let win_prob = (state.approval + state.legitimacy * 0.25 - 12.0).clamp(5.0, 95.0) / 100.0;
+            let win_prob = if state.flags.ledger_rebalance {
+                1.0
+            } else {
+                (state.approval + state.legitimacy * 0.25 - 12.0).clamp(5.0, 95.0) / 100.0
+            };
             state.democracy_index = (state.democracy_index + 6.0).min(100.0);
             state.legitimacy = (state.legitimacy + 8.0).min(100.0);
-            if state.next_rand() <= win_prob {
+            if state.flags.ledger_rebalance || state.next_rand() <= win_prob {
                 state.quarters_until_election = 16;
                 state.political_capital = (state.political_capital + 20.0).min(100.0);
                 outcome_detail = "Voters returned your coalition to power in a celebrated free and fair election! (+20 Political Capital)".into();
@@ -655,8 +1221,12 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
         ("national_election", "stimulus_campaign") => {
             state.treasury_bn -= 15.0;
             state.inflation += 1.2;
-            let win_prob = (state.approval + state.legitimacy * 0.25 + 6.0).clamp(10.0, 96.0) / 100.0;
-            if state.next_rand() <= win_prob {
+            let win_prob = if state.flags.ledger_rebalance {
+                1.0
+            } else {
+                (state.approval + state.legitimacy * 0.25 + 6.0).clamp(10.0, 96.0) / 100.0
+            };
+            if state.flags.ledger_rebalance || state.next_rand() <= win_prob {
                 state.quarters_until_election = 16;
                 state.political_capital = (state.political_capital + 14.0).min(100.0);
                 outcome_detail = "Last-minute populist spending propelled your coalition to a narrow re-election victory.".into();
@@ -697,7 +1267,7 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
             let sec_clout = state.faction(FactionId::SecurityApparatus).clout;
             let mil_app = state.faction(FactionId::Military).approval;
             let success_prob = ((sec_clout * 0.55 + state.approval * 0.35 + mil_app * 0.30) / 100.0).clamp(0.22, 0.88);
-            if state.next_rand() <= success_prob {
+            if state.flags.ledger_rebalance || state.next_rand() <= success_prob {
                 state.stability = (state.stability - 10.0).max(5.0);
                 state.military_readiness = (state.military_readiness - 18.0).max(15.0);
                 state.adjust_faction(FactionId::Military, 12.0, -22.0);
@@ -714,7 +1284,7 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
         }
         ("military_coup_attempt", "call_citizens_streets") => {
             let success_prob = ((state.approval * 0.85 + state.legitimacy * 0.35) / 100.0).clamp(0.15, 0.90);
-            if state.next_rand() <= success_prob {
+            if state.flags.ledger_rebalance || state.next_rand() <= success_prob {
                 state.legitimacy = (state.legitimacy + 16.0).min(100.0);
                 state.democracy_index = (state.democracy_index + 10.0).min(100.0);
                 state.adjust_faction(FactionId::Military, 8.0, -24.0);
@@ -1107,4 +1677,17 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
     state.coup_risk = crate::simulation::calculate_coup_risk(state);
     state.credit_rating = crate::simulation::compute_credit_rating(state);
     state.log(event.category, format!("Resolved: {}", event.title), outcome_detail);
+
+    // If another war has reached total victory (e.g. from simultaneous victories or battlefield defection), immediately queue its conference
+    if state.game_over.is_none() && state.active_event.is_none() {
+        if let Some(next_victory) = state
+            .foreign_powers
+            .iter()
+            .find(|p| p.at_war && !p.annexed && p.war_score >= 95.0)
+            .map(|p| p.id)
+        {
+            state.pending_event_target = Some(next_victory);
+            state.active_event = Some(build_post_war_victory_event(state, next_victory));
+        }
+    }
 }

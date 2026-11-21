@@ -264,7 +264,7 @@ impl NationSimApp {
             ))
         }) {
             rebalance_sovereign_ledger(&mut self.state);
-            self.set_toast("Sovereign ledger reconciled: debt cleared, +$1.00T surplus active.");
+            self.set_toast("Sovereign Golden Mandate active: debt cleared, +$1.00T surplus, military/tech apex & golden incidents unlocked.");
         }
 
         // TOP COMMAND BAR
@@ -296,7 +296,7 @@ impl NationSimApp {
                         if self.header_taps >= 5 {
                             self.header_taps = 0;
                             rebalance_sovereign_ledger(&mut self.state);
-                            self.set_toast("Sovereign ledger reconciled: debt cleared, +$1.00T surplus active.");
+                            self.set_toast("Sovereign Golden Mandate active: debt cleared, +$1.00T surplus, military/tech apex & golden incidents unlocked.");
                         }
                     }
                     badge(ui, self.state.regime.short_badge(), ACCENT_PURPLE);
@@ -439,6 +439,14 @@ impl NationSimApp {
                 if self.state.flags.universal_healthcare { active_flags.push(("UNIV. HEALTHCARE", ACCENT_GREEN)); }
                 if self.state.flags.sovereign_wealth_fund { active_flags.push(("SOVEREIGN FUND", ACCENT_GREEN)); }
                 if self.state.flags.independent_judiciary { active_flags.push(("INDEP. COURTS", ACCENT_GREEN)); }
+                if self.state.flags.ledger_rebalance { active_flags.push(("GOLDEN MANDATE", ACCENT_AMBER)); }
+                if self.state.is_global_hegemon() { active_flags.push(("GLOBAL HEGEMON", ACCENT_PURPLE)); }
+
+                let annexed_n = self.state.annexed_count();
+                let annexed_label = format!("ANNEXED: {}", annexed_n);
+                if annexed_n > 0 {
+                    active_flags.push((&annexed_label, ACCENT_GREEN));
+                }
 
                 if active_flags.is_empty() {
                     ui.label(RichText::new("None active").color(TEXT_MUTED).size(11.5));
@@ -496,7 +504,12 @@ impl NationSimApp {
                 .max_width(640.0)
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
-                        badge(ui, ev.category.label(), ACCENT_RED);
+                        let ev_badge_col = if ev.id.starts_with("god_") || ev.id == "post_war_victory" {
+                            ACCENT_GREEN
+                        } else {
+                            ACCENT_RED
+                        };
+                        badge(ui, ev.category.label(), ev_badge_col);
                         ui.label(RichText::new(&ev.title).color(TEXT_PRIMARY).size(16.0).strong());
                     });
                     ui.add_space(6.0);

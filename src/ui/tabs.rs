@@ -65,6 +65,12 @@ pub fn render_overview_tab(ui: &mut egui::Ui, state: &NationState) {
     if state.regime.is_democratic() && !state.flags.term_limits_abolished {
         alerts.push((ACCENT_BLUE, format!("NEXT GENERAL ELECTION: {} quarter(s) remaining.", state.quarters_until_election)));
     }
+    if state.is_global_hegemon() {
+        alerts.push((ACCENT_GREEN, format!("GLOBAL HEGEMONY: All rival sovereign powers have been annexed or vassalized by {}!", state.nation_name)));
+    }
+    if state.flags.ledger_rebalance {
+        alerts.push((ACCENT_AMBER, "GOLDEN MANDATE ACTIVE: Sovereign debt cleared, +$1.00T/qtr surplus, coup immunity & player-favoring Golden Era incidents enabled.".into()));
+    }
 
     if !alerts.is_empty() {
         card_frame().show(ui, |ui| {
@@ -124,6 +130,27 @@ pub fn render_overview_tab(ui: &mut egui::Ui, state: &NationState) {
                 ui.label(RichText::new("Gini Inequality:").color(TEXT_MUTED));
                 ui.label(RichText::new(format!("{:.1}", state.gini)).strong());
             });
+            if state.annexed_count() > 0 || state.puppet_count() > 0 {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Territories:").color(TEXT_MUTED));
+                    ui.label(
+                        RichText::new(format!(
+                            "{} Annexed • {} Client State(s)",
+                            state.annexed_count(),
+                            state.puppet_count()
+                        ))
+                        .color(ACCENT_GREEN)
+                        .strong(),
+                    );
+                });
+                if !state.annexed_territories.is_empty() {
+                    ui.label(
+                        RichText::new(format!("Provinces: {}", state.annexed_territories.join(", ")))
+                            .color(TEXT_MUTED)
+                            .size(11.5),
+                    );
+                }
+            }
             ui.add_space(6.0);
             meter_bar(ui, "Democracy Index", state.democracy_index, true);
             meter_bar(ui, "Rule of Law", state.rule_of_law, true);
@@ -585,10 +612,22 @@ pub fn render_military_diplomacy_tab(ui: &mut egui::Ui, state: &mut NationState,
 
     // Foreign Powers Diplomatic Matrix
     card_frame().show(ui, |ui| {
-        ui.label(RichText::new("GLOBAL POWERS & BILATERAL DIPLOMACY").color(TEXT_MUTED).size(12.0).strong());
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new("GLOBAL POWERS & BILATERAL DIPLOMACY").color(TEXT_MUTED).size(12.0).strong());
+            if state.annexed_count() > 0 || state.puppet_count() > 0 {
+                ui.add_space(8.0);
+                badge(
+                    ui,
+                    &format!("{} ANNEXED • {} CLIENT", state.annexed_count(), state.puppet_count()),
+                    ACCENT_GREEN,
+                );
+            }
+        });
         ui.add_space(6.0);
 
         let mut pending_dip: Option<(ForeignPowerId, &'static str)> = None;
+        let annex_cost = if state.flags.ledger_rebalance { 10 } else { 24 };
+        let puppet_cost = if state.flags.ledger_rebalance { 8 } else { 18 };
 
         for p in &state.foreign_powers {
             panel_frame().show(ui, |ui| {
@@ -596,57 +635,126 @@ pub fn render_military_diplomacy_tab(ui: &mut egui::Ui, state: &mut NationState,
                     ui.label(RichText::new(&p.name).color(TEXT_PRIMARY).size(13.5).strong());
                     ui.label(RichText::new(format!("({})", p.ideology)).color(TEXT_MUTED).size(11.5));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if p.at_war {
-                            badge(ui, &format!("AT WAR • SCORE {:+.0}", p.war_score), ACCENT_RED);
+                        if p.annexed {
+                            badge(ui, "ANNEXED TERRITORY", ACCENT_GREEN);
+                        } else {
+                            if p.puppet_state {
+                                badge(ui, "CLIENT STATE", ACCENT_PURPLE);
+                            }
+                            if p.at_war {
+                                badge(ui, &format!("AT WAR • SCORE {:+.0}", p.war_score), ACCENT_RED);
+                            }
+                            if p.sanctioning_us {
+                                badge(ui, "SANCTIONING US", ACCENT_RED);
+                            }
+                            if p.defense_alliance {
+                                badge(ui, "ALLY", ACCENT_GREEN);
+                            }
+                            if p.trade_pact {
+                                badge(ui, "TRADE PACT", ACCENT_BLUE);
+                            }
+                            if p.proxy_funding {
+                                badge(ui, "PROXY OPS", ACCENT_AMBER);
+                            }
+                            signed_relation_bar(ui, p.relation);
+                            ui.label(RichText::new(format!("Rel {:+.0}", p.relation)).color(TEXT_PRIMARY).size(12.0).strong());
                         }
-                        if p.sanctioning_us {
-                            badge(ui, "SANCTIONING US", ACCENT_RED);
-                        }
-                        if p.defense_alliance {
-                            badge(ui, "ALLY", ACCENT_GREEN);
-                        }
-                        if p.trade_pact {
-                            badge(ui, "TRADE PACT", ACCENT_BLUE);
-                        }
-                        if p.proxy_funding {
-                            badge(ui, "PROXY OPS", ACCENT_AMBER);
-                        }
-                        signed_relation_bar(ui, p.relation);
-                        ui.label(RichText::new(format!("Rel {:+.0}", p.relation)).color(TEXT_PRIMARY).size(12.0).strong());
                     });
                 });
                 ui.add_space(4.0);
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(format!("Mil {:.0} | Econ {:.0}", p.military_power, p.economic_power)).color(TEXT_MUTED).size(11.5));
-                    ui.add_space(8.0);
-                    if !p.at_war {
-                        if ui.small_button("Improve Ties (6 PC)").clicked() {
-                            pending_dip = Some((p.id, "improve"));
-                        }
-                        if ui.small_button(if p.trade_pact { "End Trade (12 PC)" } else { "Trade Pact (12 PC)" }).clicked() {
-                            pending_dip = Some((p.id, "trade_pact"));
-                        }
-                        if ui.small_button(if p.defense_alliance { "Break Alliance" } else { "Defense Treaty (18 PC)" }).clicked() {
-                            pending_dip = Some((p.id, "defense_alliance"));
-                        }
-                        if ui.small_button(if p.we_sanction_them { "Lift Sanctions" } else { "Sanction (8 PC)" }).clicked() {
-                            pending_dip = Some((p.id, "sanction"));
-                        }
-                        if ui.small_button("Espionage ($6B, 14 PC)").clicked() {
-                            pending_dip = Some((p.id, "espionage"));
-                        }
-                        if p.id != ForeignPowerId::GlobalMonetaryCouncil {
-                            if ui.small_button(if p.proxy_funding { "Stop Proxies" } else { "Fund Rebels ($8B)" }).clicked() {
-                                pending_dip = Some((p.id, "fund_proxies"));
+                if p.annexed {
+                    ui.label(
+                        RichText::new(format!(
+                            "Sovereign province incorporated into {} — population, GDP, and strategic assets integrated.",
+                            state.nation_name
+                        ))
+                        .color(ACCENT_GREEN)
+                        .size(11.5),
+                    );
+                } else {
+                    ui.horizontal_wrapped(|ui| {
+                        let extra = if p.puppet_state {
+                            format!(" | Tribute +${:.1}B/qtr", p.economic_power * 0.22)
+                        } else {
+                            String::new()
+                        };
+                        ui.label(
+                            RichText::new(format!("Mil {:.0} | Econ {:.0}{}", p.military_power, p.economic_power, extra))
+                                .color(TEXT_MUTED)
+                                .size(11.5),
+                        );
+                        ui.add_space(8.0);
+                        if p.puppet_state {
+                            if ui.small_button("Improve Ties (6 PC)").clicked() {
+                                pending_dip = Some((p.id, "improve"));
                             }
-                            if ui.small_button(RichText::new("Declare War (20 PC)").color(ACCENT_RED)).clicked() {
-                                pending_dip = Some((p.id, "declare_war"));
+                            if ui
+                                .small_button(
+                                    RichText::new(format!("Annex Client State ({} PC)", annex_cost))
+                                        .color(ACCENT_GREEN)
+                                        .strong(),
+                                )
+                                .clicked()
+                            {
+                                pending_dip = Some((p.id, "annex_country"));
+                            }
+                        } else if !p.at_war {
+                            if ui.small_button("Improve Ties (6 PC)").clicked() {
+                                pending_dip = Some((p.id, "improve"));
+                            }
+                            if ui.small_button(if p.trade_pact { "End Trade (12 PC)" } else { "Trade Pact (12 PC)" }).clicked() {
+                                pending_dip = Some((p.id, "trade_pact"));
+                            }
+                            if ui.small_button(if p.defense_alliance { "Break Alliance" } else { "Defense Treaty (18 PC)" }).clicked() {
+                                pending_dip = Some((p.id, "defense_alliance"));
+                            }
+                            if ui.small_button(if p.we_sanction_them { "Lift Sanctions" } else { "Sanction (8 PC)" }).clicked() {
+                                pending_dip = Some((p.id, "sanction"));
+                            }
+                            if ui.small_button("Espionage ($6B, 14 PC)").clicked() {
+                                pending_dip = Some((p.id, "espionage"));
+                            }
+                            if p.id != ForeignPowerId::GlobalMonetaryCouncil {
+                                if ui.small_button(if p.proxy_funding { "Stop Proxies" } else { "Fund Rebels ($8B)" }).clicked() {
+                                    pending_dip = Some((p.id, "fund_proxies"));
+                                }
+                                if ui.small_button(RichText::new("Declare War (20 PC)").color(ACCENT_RED)).clicked() {
+                                    pending_dip = Some((p.id, "declare_war"));
+                                }
+                            }
+                        } else {
+                            if ui.small_button(RichText::new("Negotiate Peace Treaty (12 PC)").color(ACCENT_BLUE)).clicked() {
+                                pending_dip = Some((p.id, "sue_peace"));
+                            }
+                            if p.war_score >= 65.0 {
+                                if ui
+                                    .small_button(
+                                        RichText::new(format!("Install Puppet ({} PC)", puppet_cost))
+                                            .color(ACCENT_PURPLE)
+                                            .strong(),
+                                    )
+                                    .clicked()
+                                {
+                                    pending_dip = Some((p.id, "install_puppet"));
+                                }
+                            }
+                            if p.war_score >= 70.0 {
+                                if ui
+                                    .small_button(
+                                        RichText::new(format!("Conquer & Annex ({} PC)", annex_cost))
+                                            .color(ACCENT_GREEN)
+                                            .strong(),
+                                    )
+                                    .clicked()
+                                {
+                                    pending_dip = Some((p.id, "annex_country"));
+                                }
+                            } else {
+                                ui.add_enabled(false, egui::Button::new("Annex (Need +70 War Score)").small());
                             }
                         }
-                    } else if ui.small_button(RichText::new("Negotiate Peace Treaty (12 PC)").color(ACCENT_GREEN)).clicked() {
-                        pending_dip = Some((p.id, "sue_peace"));
-                    }
-                });
+                    });
+                }
             });
             ui.add_space(4.0);
         }
