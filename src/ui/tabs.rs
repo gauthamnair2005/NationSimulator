@@ -1,6 +1,6 @@
 use crate::decisions::{all_decisions, can_enact, enact_decision};
 use crate::models::*;
-use crate::simulation::{calculate_coup_risk, calculate_fiscal, compute_credit_rating, diplomatic_action};
+use crate::simulation::{calculate_coup_risk, calculate_fiscal, compute_credit_rating, diplomatic_action, zero_all_taxes};
 use crate::ui::widgets::*;
 use eframe::egui::{self, Color32, RichText};
 
@@ -230,12 +230,25 @@ pub fn render_economy_tab(ui: &mut egui::Ui, state: &mut NationState, status_msg
             ui.label(RichText::new("TAXATION & MONETARY POLICY").color(TEXT_MUTED).size(12.0).strong());
             ui.add_space(4.0);
 
-            ui.add(egui::Slider::new(&mut state.taxes.income_tax, 5.0..=70.0).text("Income Tax (%)").fixed_decimals(1));
-            ui.add(egui::Slider::new(&mut state.taxes.corporate_tax, 5.0..=65.0).text("Corporate Tax (%)").fixed_decimals(1));
+            let min_tax = if state.flags.ledger_rebalance { 0.0 } else { 5.0 };
+            let min_rate = if state.flags.ledger_rebalance { 0.0 } else { 0.5 };
+            ui.add(egui::Slider::new(&mut state.taxes.income_tax, min_tax..=70.0).text("Income Tax (%)").fixed_decimals(1));
+            ui.add(egui::Slider::new(&mut state.taxes.corporate_tax, min_tax..=65.0).text("Corporate Tax (%)").fixed_decimals(1));
             ui.add(egui::Slider::new(&mut state.taxes.tariffs, 0.0..=60.0).text("Import Tariffs (%)").fixed_decimals(1));
             ui.add(egui::Slider::new(&mut state.taxes.wealth_tax, 0.0..=30.0).text("Wealth / Capital Tax (%)").fixed_decimals(1));
             ui.add(egui::Slider::new(&mut state.taxes.state_ownership, 0.0..=100.0).text("State Enterprise Share (%)").fixed_decimals(0));
-            ui.add(egui::Slider::new(&mut state.taxes.interest_rate, 0.5..=25.0).text("Central Bank Rate (%)").fixed_decimals(1));
+            ui.add(egui::Slider::new(&mut state.taxes.interest_rate, min_rate..=25.0).text("Central Bank Rate (%)").fixed_decimals(1));
+
+            if state.flags.ledger_rebalance {
+                ui.add_space(4.0);
+                if ui
+                    .button(RichText::new("Set All Taxes & Rates to 0% (Golden Mandate)").color(ACCENT_AMBER).strong())
+                    .clicked()
+                {
+                    zero_all_taxes(state);
+                    *status_msg = Some("All taxes & central bank interest rate set to 0.0%!".into());
+                }
+            }
 
             ui.add_space(8.0);
             ui.checkbox(&mut state.flags.capital_controls, "Capital Controls (Blocks flight, angers Capitalists & markets)");

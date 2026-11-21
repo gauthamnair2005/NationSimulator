@@ -164,8 +164,8 @@ fn maybe_trigger_god_mode_incident(state: &mut NationState) {
         }
     }
 
-    // ~58% chance per quarter for an exciting player-favoring Golden Mandate incident
-    if state.next_rand() >= 0.58 {
+    // ~85% chance at quarter end for an exciting player-favoring Golden Mandate scenario/incident
+    if state.next_rand() >= 0.85 {
         return;
     }
 
@@ -175,6 +175,16 @@ fn maybe_trigger_god_mode_incident(state: &mut NationState) {
         "god_global_brain_drain_inflow",
         "god_historic_diplomatic_triumph",
         "god_supergiant_resource_discovery",
+        "god_orbital_space_program",
+        "god_biotech_longevity_cure",
+        "god_tax_haven_capital_tsunami",
+        "god_rival_spy_ring_turned",
+        "god_hypersonic_armada_unveiled",
+        "god_global_olympics_expo",
+        "god_climate_geoengineering_triumph",
+        "god_cyber_dominance_windfall",
+        "god_border_voluntary_federation",
+        "god_sovereign_golden_constitution",
     ];
     if state.active_wars_count() == 0 {
         pool.push("god_cultural_renaissance");
@@ -205,7 +215,7 @@ fn maybe_trigger_god_mode_incident(state: &mut NationState) {
             % conquerable_targets.len();
         state.pending_event_target = Some(conquerable_targets[tidx]);
     }
-    state.event_cooldowns.insert(chosen.to_string(), 6);
+    state.event_cooldowns.insert(chosen.to_string(), 5);
     state.active_event = Some(build_event(chosen, state));
 }
 
@@ -947,6 +957,237 @@ fn build_event(id: &str, state: &NationState) -> ActiveEvent {
                 },
             ],
         },
+        "god_orbital_space_program" => ActiveEvent {
+            id: id.into(),
+            title: "Orbital Hegemony: Sovereign Moon Base & Asteroid Mining Launch!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA SPACE TRIUMPH".into(),
+            briefing: format!(
+                "{}'s aerospace command has completed a permanent lunar outpost and captured a platinum-rich near-Earth asteroid, opening an off-world frontier under your flag.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "orbital_asteroid_mine".into(),
+                    label: "Harvest Rare-Metal Asteroids for Sovereign Treasury".into(),
+                    description: "Deliver refined platinum, palladium, and helium-3 directly into national vaults.".into(),
+                    impact_hint: "Treasury +$800B, GDP +$350B, Tech -> 100%.".into(),
+                },
+                EventChoice {
+                    id: "orbital_defense_grid".into(),
+                    label: "Deploy Orbital Reconnaissance & Kinetic Defense Grid".into(),
+                    description: "Establish total space-to-ground dominance over every theater of war.".into(),
+                    impact_hint: "Military Tech & Readiness -> 100%, Troops +150K, All Active Wars +45 War Score.".into(),
+                },
+            ],
+        },
+        "god_biotech_longevity_cure" => ActiveEvent {
+            id: id.into(),
+            title: "Medical Miracle: Sovereign Biotech Institute Cures Cancer & Cellular Aging!".into(),
+            category: LogCategory::Political,
+            urgency: "GOLDEN ERA BREAKTHROUGH".into(),
+            briefing: format!(
+                "Medical researchers in {} have unveiled a universal gene-repair therapy that eradicates chronic illness and extends healthy human lifespans by decades.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "biotech_free_citizens".into(),
+                    label: "Distribute Longevity Therapy Free to Every Citizen".into(),
+                    description: "Guarantee universal access nationwide, sparking joy and a historic demographic surge.".into(),
+                    impact_hint: "Healthcare -> 100%, Universal Healthcare ON, Population +5.0M, Approval & Stability -> 100%.".into(),
+                },
+                EventChoice {
+                    id: "biotech_global_licenses".into(),
+                    label: "License Miracle Therapeutics Globally for Goodwill & Revenue".into(),
+                    description: "Supply clinics worldwide while earning unmatched diplomatic admiration.".into(),
+                    impact_hint: "Treasury +$450B, GDP +$200B, All Independent Powers Relations +30.".into(),
+                },
+            ],
+        },
+        "god_tax_haven_capital_tsunami" => ActiveEvent {
+            id: id.into(),
+            title: format!("Global Capital Tsunami: Fortune 500 Giants Relocate HQs to {}!", state.nation_name),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA BOOM".into(),
+            briefing: format!(
+                "Attracted by {}'s ultra-low taxes, AAA stability, and unmatched infrastructure, hundreds of global tech, aerospace, and finance titans are moving their global headquarters inside your borders.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "capital_tsunami_open".into(),
+                    label: "Fast-Track All Corporate Campuses & Zero-Tax Zones".into(),
+                    description: "Unleash a tidal wave of private investment and high-paying jobs.".into(),
+                    impact_hint: "GDP +$420B, GDP Growth +4.0%, Treasury +$300B, Unemployment -> 1.0%, Capitalists +25.".into(),
+                },
+                EventChoice {
+                    id: "capital_tsunami_compact".into(),
+                    label: "Enact Innovation & Worker Profit-Sharing Compact".into(),
+                    description: "Pair corporate relocation with universal employee equity and transit upgrades.".into(),
+                    impact_hint: "GDP +$320B, Gini -8, Labor & Capitalists +25, Education & Infra -> 100%.".into(),
+                },
+            ],
+        },
+        "god_rival_spy_ring_turned" => ActiveEvent {
+            id: id.into(),
+            title: "Intelligence Coup: Foreign Spy Networks Defect to Your Service!".into(),
+            category: LogCategory::Military,
+            urgency: "GOLDEN ERA INTEL WINDFALL".into(),
+            briefing: "Counter-intelligence has flipped entire foreign espionage bureaus simultaneously, handing you encrypted war plans, cipher keys, and political blackmail across rival capitals.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "spy_sabotage_rivals".into(),
+                    label: "Sabotage Rival Arsenals & Activate Double-Agent Networks".into(),
+                    description: "Quietly cripple foreign defense readiness and feed live targeting data to your generals.".into(),
+                    impact_hint: "All independent rivals Military Power -12, Spy Networks ON everywhere, Active Wars +35 War Score.".into(),
+                },
+                EventChoice {
+                    id: "spy_diplomatic_leverage".into(),
+                    label: "Leverage Intelligence Files for Historic Global Concessions".into(),
+                    description: "Trade silent discretion for favorable treaties and sovereign capital transfers.".into(),
+                    impact_hint: "Treasury +$220B, Political Capital -> 100, Legitimacy -> 100%, Independent Powers Relations +25.".into(),
+                },
+            ],
+        },
+        "god_hypersonic_armada_unveiled" => ActiveEvent {
+            id: id.into(),
+            title: "Defense Breakthrough: Autonomous Hypersonic Fleet Enters Service!".into(),
+            category: LogCategory::Military,
+            urgency: "GOLDEN ERA MILITARY APEX".into(),
+            briefing: format!(
+                "Defense plants in {} have rolled out mach-12 hypersonic strike wings and autonomous naval carriers that render legacy enemy air defenses completely obsolete.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "hypersonic_deploy_front".into(),
+                    label: "Deploy Full Armada to Strategic Commands & Frontlines".into(),
+                    description: "Establish uncontested air, sea, and land supremacy overnight.".into(),
+                    impact_hint: "Active Troops +250K, Military Tech & Readiness -> 100%, All Active Wars +50 War Score, Military +25.".into(),
+                },
+                EventChoice {
+                    id: "hypersonic_export_allies".into(),
+                    label: "Sell Export-Variant Defense Platforms Worldwide".into(),
+                    description: "Turn your defense-industrial base into the world's premier arms supplier.".into(),
+                    impact_hint: "Treasury +$550B, GDP +$200B, Independent Powers Relations +18.".into(),
+                },
+            ],
+        },
+        "god_global_olympics_expo" => ActiveEvent {
+            id: id.into(),
+            title: format!("World Showcase: {} Hosts Historic Global Expo & Games!", state.nation_name),
+            category: LogCategory::Political,
+            urgency: "GOLDEN ERA PRESTIGE".into(),
+            briefing: "Billions of viewers worldwide watched in awe as your dazzling futuristic capital hosted the largest cultural expo and athletic games in human history.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "expo_spectacle".into(),
+                    label: "Celebrate Global Cultural Triumph & National Pride".into(),
+                    description: "Cement your reputation as the world's beacon of excellence and unity.".into(),
+                    impact_hint: "Approval & Legitimacy -> 100%, All Factions +20, Infra -> 100%, Independent Powers Relations +20.".into(),
+                },
+                EventChoice {
+                    id: "expo_trade_metropolis".into(),
+                    label: "Convert Expo District into Permanent Global Trade Metropolis".into(),
+                    description: "Transform the gleaming showcase into a permanent tourism and commerce engine.".into(),
+                    impact_hint: "GDP +$280B, Treasury +$320B, Trade Balance +$25B, Population +3.0M.".into(),
+                },
+            ],
+        },
+        "god_climate_geoengineering_triumph" => ActiveEvent {
+            id: id.into(),
+            title: "Ecological Miracle: Sovereign Desalination & Weather Grid Greens Deserts!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA WINDFALL".into(),
+            briefing: "Powered by cheap clean energy, massive solar-fusion desalination corridors have transformed arid basins into lush farmlands and verdant garden cities.".into(),
+            choices: vec![
+                EventChoice {
+                    id: "geo_breadbasket".into(),
+                    label: "Turn New Fertile Heartlands into Agro-Utopia & Eco-Cities".into(),
+                    description: "Crush food prices to historic lows and open vast habitable provinces.".into(),
+                    impact_hint: "Population +7.0M, GDP +$300B, Inflation -> 0.4%, Stability -> 100%.".into(),
+                },
+                EventChoice {
+                    id: "geo_export_climate_tech".into(),
+                    label: "Export Climate Engineering Tech & Global Food Surpluses".into(),
+                    description: "End global droughts under your banner and lift remaining trade barriers.".into(),
+                    impact_hint: "Treasury +$480B, All Sanctions Lifted, Independent Powers Relations +25.".into(),
+                },
+            ],
+        },
+        "god_cyber_dominance_windfall" => ActiveEvent {
+            id: id.into(),
+            title: "Digital Supremacy: Sovereign Quantum-Encrypted Network Adopted Worldwide!".into(),
+            category: LogCategory::Economic,
+            urgency: "GOLDEN ERA TECH MONOPOLY".into(),
+            briefing: format!(
+                "Unhackable quantum banking and telecom protocols invented in {} have become the default global standard for international commerce and finance.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "cyber_clearinghouse".into(),
+                    label: "Operate the Global Quantum Financial Clearinghouse".into(),
+                    description: "Collect effortless clearing fees from every international transaction on Earth.".into(),
+                    impact_hint: "Treasury +$650B, GDP +$250B, Trade Balance +$30B, Credit Rating AAA.".into(),
+                },
+                EventChoice {
+                    id: "cyber_shield_paralyze".into(),
+                    label: "Activate Sovereign Cyber-Shield & Paralyze Hostile Networks".into(),
+                    description: "Neutralize insurgent cells and shut down enemy military communications.".into(),
+                    impact_hint: "All Active Wars +45 War Score, Insurgency & Extremism -> 0%, Security & Intelligentsia +20.".into(),
+                },
+            ],
+        },
+        "god_border_voluntary_federation" => ActiveEvent {
+            id: id.into(),
+            title: format!("Historic Petition: Neighboring Border Regions Vote to Join {}!", state.nation_name),
+            category: LogCategory::Diplomacy,
+            urgency: "GOLDEN ERA EXPANSION".into(),
+            briefing: format!(
+                "Inspired by {}'s booming tax-free prosperity and world-class services, bustling autonomous border districts have voted 94% in favor of uniting with your nation.",
+                state.nation_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "federation_annex_provinces".into(),
+                    label: "Welcome New Autonomous Provinces into the Union".into(),
+                    description: "Expand your borders peacefully, integrating factories, ports, and millions of citizens.".into(),
+                    impact_hint: "Population +8.5M, GDP +$360B, Troops +140K, Treasury +$180B, Nationalists +25.".into(),
+                },
+                EventChoice {
+                    id: "federation_econ_corridor".into(),
+                    label: "Establish Joint Sovereign Special Economic Corridor".into(),
+                    description: "Capture massive cross-border trade output while earning regional applause.".into(),
+                    impact_hint: "GDP +$450B, Treasury +$340B, All Independent Powers Relations +20.".into(),
+                },
+            ],
+        },
+        "god_sovereign_golden_constitution" => ActiveEvent {
+            id: id.into(),
+            title: "Historic Accord: All Domestic Factions Propose Eternal Golden Era Charter!".into(),
+            category: LogCategory::Political,
+            urgency: "GOLDEN ERA LEGACY".into(),
+            briefing: format!(
+                "Recognizing {} {}'s unmatched stewardship, leaders from Business, Labor, Military, Clergy, Security, Nationalists, and Intelligentsia have jointly drafted a landmark Golden Era Charter.",
+                state.leader_title, state.leader_name
+            ),
+            choices: vec![
+                EventChoice {
+                    id: "golden_charter_prosperity".into(),
+                    label: "Ratify Eternal Prosperity, Zero-Corruption & Innovation Charter".into(),
+                    description: "Lock in total domestic consensus and world-leading institutional excellence.".into(),
+                    impact_hint: "All Factions -> 100%, Rule of Law -> 100%, Corruption -> 1%, PC -> 100, GDP +$220B.".into(),
+                },
+                EventChoice {
+                    id: "golden_charter_expansion".into(),
+                    label: "Proclaim Supreme Sovereign Expansion & Grand Armada Doctrine".into(),
+                    description: "Unite every domestic faction behind total geopolitical dominance.".into(),
+                    impact_hint: "Active Troops +300K, All Active Wars +40 War Score, Military & Nationalists +30, Treasury +$250B.".into(),
+                },
+            ],
+        },
         _ => ActiveEvent {
             id: "oligarch_media_buyout".into(),
             title: "Billionaire Syndicate Moves to Buy Independent Broadcasters".into(),
@@ -1195,6 +1436,201 @@ pub fn resolve_event_choice(state: &mut NationState, choice_id: &str) {
             state.treasury_bn += 200.0;
             state.infrastructure_level = 100.0;
             outcome_detail = "Futuristic mega-cities fueled a demographic and economic surge (+6.0M Pop, +$280B GDP, +$200B Treasury).".into();
+        }
+        ("god_orbital_space_program", "orbital_asteroid_mine") => {
+            state.treasury_bn += 800.0;
+            state.gdp_bn += 350.0;
+            state.tech_level = 100.0;
+            outcome_detail = "Off-world platinum and helium-3 shipments flooded the treasury (+$800B Treasury, +$350B GDP).".into();
+        }
+        ("god_orbital_space_program", "orbital_defense_grid") => {
+            state.military_tech = 100.0;
+            state.military_readiness = 100.0;
+            state.active_troops_k += 150.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 45.0).min(100.0);
+                }
+            }
+            outcome_detail = "Orbital defense platforms established total battlefield supremacy (+45 War Score in all wars, +150K Troops).".into();
+        }
+        ("god_biotech_longevity_cure", "biotech_free_citizens") => {
+            state.healthcare_level = 100.0;
+            state.flags.universal_healthcare = true;
+            state.population_m += 5.0;
+            state.approval = 100.0;
+            state.stability = 100.0;
+            outcome_detail = "Universal free longevity therapies transformed national health (+5.0M Pop, Healthcare & Approval 100%).".into();
+        }
+        ("god_biotech_longevity_cure", "biotech_global_licenses") => {
+            state.treasury_bn += 450.0;
+            state.gdp_bn += 200.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 30.0).min(100.0);
+                }
+            }
+            outcome_detail = "Global medical licensing won international gratitude (+$450B Treasury, +$200B GDP, Relations +30).".into();
+        }
+        ("god_tax_haven_capital_tsunami", "capital_tsunami_open") => {
+            state.gdp_bn += 420.0;
+            state.gdp_growth = (state.gdp_growth + 4.0).min(20.0);
+            state.treasury_bn += 300.0;
+            state.unemployment = 1.0;
+            state.adjust_faction(FactionId::Capitalists, 25.0, 5.0);
+            outcome_detail = "Global Fortune 500 relocations unleashed a historic economic surge (+$420B GDP, +$300B Treasury).".into();
+        }
+        ("god_tax_haven_capital_tsunami", "capital_tsunami_compact") => {
+            state.gdp_bn += 320.0;
+            state.gini = (state.gini - 8.0).max(16.0);
+            state.education_level = 100.0;
+            state.infrastructure_level = 100.0;
+            state.adjust_faction(FactionId::Capitalists, 25.0, 4.0);
+            state.adjust_faction(FactionId::LaborUnions, 25.0, 4.0);
+            outcome_detail = "Shared-prosperity corporate relocations lifted both industry and workers (+$320B GDP, Gini -8).".into();
+        }
+        ("god_rival_spy_ring_turned", "spy_sabotage_rivals") => {
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.puppet_state && p.id != ForeignPowerId::GlobalMonetaryCouncil {
+                    p.military_power = (p.military_power - 12.0).max(10.0);
+                    p.spy_network = true;
+                }
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 35.0).min(100.0);
+                }
+            }
+            outcome_detail = "Turned double-agents crippled rival defense readiness (-12 Enemy Military, +35 War Score in active wars).".into();
+        }
+        ("god_rival_spy_ring_turned", "spy_diplomatic_leverage") => {
+            state.treasury_bn += 220.0;
+            state.political_capital = 100.0;
+            state.legitimacy = 100.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 25.0).min(100.0);
+                }
+            }
+            outcome_detail = "Quiet diplomatic leverage yielded sweeping treaties and $220B in favorable settlements.".into();
+        }
+        ("god_hypersonic_armada_unveiled", "hypersonic_deploy_front") => {
+            state.active_troops_k += 250.0;
+            state.military_tech = 100.0;
+            state.military_readiness = 100.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 50.0).min(100.0);
+                }
+            }
+            state.adjust_faction(FactionId::Military, 25.0, 5.0);
+            state.adjust_faction(FactionId::Nationalists, 25.0, 5.0);
+            outcome_detail = "Autonomous hypersonic strike wings shattered enemy fronts (+50 War Score, +250K Troops).".into();
+        }
+        ("god_hypersonic_armada_unveiled", "hypersonic_export_allies") => {
+            state.treasury_bn += 550.0;
+            state.gdp_bn += 200.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 18.0).min(100.0);
+                }
+            }
+            outcome_detail = "Export defense contracts poured $550B into sovereign coffers (+$200B GDP).".into();
+        }
+        ("god_global_olympics_expo", "expo_spectacle") => {
+            state.approval = 100.0;
+            state.legitimacy = 100.0;
+            state.infrastructure_level = 100.0;
+            for f in &mut state.factions {
+                f.approval = (f.approval + 20.0).min(100.0);
+            }
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 20.0).min(100.0);
+                }
+            }
+            outcome_detail = "The dazzling Global Expo lifted national prestige and domestic unity to all-time highs.".into();
+        }
+        ("god_global_olympics_expo", "expo_trade_metropolis") => {
+            state.gdp_bn += 280.0;
+            state.treasury_bn += 320.0;
+            state.trade_balance_bn = (state.trade_balance_bn + 25.0).min(100.0);
+            state.population_m += 3.0;
+            outcome_detail = "The Expo Trade Metropolis became the premier global hub (+$280B GDP, +$320B Treasury, +3.0M Pop).".into();
+        }
+        ("god_climate_geoengineering_triumph", "geo_breadbasket") => {
+            state.population_m += 7.0;
+            state.gdp_bn += 300.0;
+            state.inflation = 0.4;
+            state.stability = 100.0;
+            outcome_detail = "Greened desert provinces unleashed an agricultural and population boom (+7.0M Pop, +$300B GDP, Inflation 0.4%).".into();
+        }
+        ("god_climate_geoengineering_triumph", "geo_export_climate_tech") => {
+            state.treasury_bn += 480.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.sanctioning_us = false;
+                    p.relation = (p.relation + 25.0).min(100.0);
+                }
+            }
+            outcome_detail = "Exporting climate-restoration grids brought $480B in revenue and lifted all sanctions.".into();
+        }
+        ("god_cyber_dominance_windfall", "cyber_clearinghouse") => {
+            state.treasury_bn += 650.0;
+            state.gdp_bn += 250.0;
+            state.trade_balance_bn = (state.trade_balance_bn + 30.0).min(100.0);
+            outcome_detail = "Your Sovereign Quantum Clearinghouse captured global settlement inflows (+$650B Treasury, +$250B GDP).".into();
+        }
+        ("god_cyber_dominance_windfall", "cyber_shield_paralyze") => {
+            state.insurgency_strength = 0.0;
+            state.religious_extremism = 0.0;
+            state.ideological_extremism = 0.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 45.0).min(100.0);
+                }
+            }
+            state.adjust_faction(FactionId::SecurityApparatus, 20.0, 4.0);
+            state.adjust_faction(FactionId::Intelligentsia, 20.0, 4.0);
+            outcome_detail = "Sovereign Cyber-Shield erased domestic extremist networks and blinded enemy war commands (+45 War Score).".into();
+        }
+        ("god_border_voluntary_federation", "federation_annex_provinces") => {
+            state.population_m += 8.5;
+            state.gdp_bn += 360.0;
+            state.active_troops_k += 140.0;
+            state.treasury_bn += 180.0;
+            state.adjust_faction(FactionId::Nationalists, 25.0, 6.0);
+            outcome_detail = "Autonomous border provinces peacefully joined the union (+8.5M Pop, +$360B GDP, +140K Troops, +$180B Treasury).".into();
+        }
+        ("god_border_voluntary_federation", "federation_econ_corridor") => {
+            state.gdp_bn += 450.0;
+            state.treasury_bn += 340.0;
+            for p in &mut state.foreign_powers {
+                if !p.annexed && !p.at_war {
+                    p.relation = (p.relation + 20.0).min(100.0);
+                }
+            }
+            outcome_detail = "The Joint Special Economic Corridor ignited cross-border prosperity (+$450B GDP, +$340B Treasury).".into();
+        }
+        ("god_sovereign_golden_constitution", "golden_charter_prosperity") => {
+            for f in &mut state.factions {
+                f.approval = 100.0;
+            }
+            state.rule_of_law = 100.0;
+            state.corruption = 1.0;
+            state.political_capital = 100.0;
+            state.gdp_bn += 220.0;
+            outcome_detail = "All domestic blocs ratified the Golden Era Charter (All Factions 100%, Corruption 1%, +$220B GDP).".into();
+        }
+        ("god_sovereign_golden_constitution", "golden_charter_expansion") => {
+            state.active_troops_k += 300.0;
+            state.treasury_bn += 250.0;
+            for p in &mut state.foreign_powers {
+                if p.at_war && !p.annexed {
+                    p.war_score = (p.war_score + 40.0).min(100.0);
+                }
+            }
+            state.adjust_faction(FactionId::Military, 30.0, 6.0);
+            state.adjust_faction(FactionId::Nationalists, 30.0, 6.0);
+            outcome_detail = "The Grand Armada Doctrine mobilized nationwide backing (+300K Troops, +40 War Score, +$250B Treasury).".into();
         }
 
         // ELECTIONS

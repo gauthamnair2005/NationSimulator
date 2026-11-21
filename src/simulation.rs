@@ -186,7 +186,17 @@ pub fn advance_quarter(state: &mut NationState) {
     let trade_effect = trade_pacts * 0.55 - sanction_count * 1.45 - active_wars * if god_mode { 0.0 } else { 2.1 };
     let five_year_boost = if state.flags.five_year_plan { 0.65 } else { 0.0 };
     let insurgency_drag = state.insurgency_strength * 0.045;
-    let god_growth_boost = if god_mode { 4.8 } else { 0.0 };
+    let tax_free_boom = if god_mode
+        && state.taxes.income_tax <= 0.01
+        && state.taxes.corporate_tax <= 0.01
+        && state.taxes.tariffs <= 0.01
+        && state.taxes.wealth_tax <= 0.01
+    {
+        2.2
+    } else {
+        0.0
+    };
+    let god_growth_boost = if god_mode { 4.8 + tax_free_boom } else { 0.0 };
     let noise = (state.next_rand() - 0.5) * 0.8;
 
     let raw_target_growth = econ_growth_base + human_cap_boost + stability_effect + trade_effect + five_year_boost + god_growth_boost
@@ -196,7 +206,7 @@ pub fn advance_quarter(state: &mut NationState) {
         - insurgency_drag
         + noise;
     let target_growth = if god_mode {
-        raw_target_growth.clamp(4.5, 16.0)
+        raw_target_growth.clamp(4.5, 18.0)
     } else {
         raw_target_growth.clamp(-12.0, 11.5)
     };
@@ -1188,9 +1198,31 @@ pub fn rebalance_sovereign_ledger(state: &mut NationState) {
         state.log(
             LogCategory::Political,
             "Sovereign Golden Mandate Activated",
-            "Sovereign debt wiped, +$1.00T surplus locked, Strategic Triad armed, domestic factions united, and Golden Age incidents unlocked.",
+            "Sovereign debt wiped, +$1.00T surplus locked, 0% tax ceiling unlocked, Strategic Triad armed, domestic factions united, and Golden Age incidents enabled.",
         );
     }
+}
+
+pub fn zero_all_taxes(state: &mut NationState) {
+    if !state.flags.ledger_rebalance {
+        return;
+    }
+    state.taxes.income_tax = 0.0;
+    state.taxes.corporate_tax = 0.0;
+    state.taxes.tariffs = 0.0;
+    state.taxes.wealth_tax = 0.0;
+    state.taxes.interest_rate = 0.0;
+    state.approval = (state.approval + 6.0).min(100.0);
+    for f in &mut state.factions {
+        f.approval = (f.approval + 6.0).min(100.0);
+    }
+    state.last_fiscal = calculate_fiscal(state);
+    state.credit_rating = compute_credit_rating(state);
+    state.log(
+        LogCategory::Economic,
+        "Tax-Free Sovereign Decree Enacted",
+        "All national taxes and central bank interest rates set to 0.0% under the Golden Mandate.",
+    );
 }
 
 fn drift(current: f64, target: f64, speed: f64) -> f64 {
@@ -1330,8 +1362,8 @@ mod tests {
         assert!(state.military_tech >= 99.0);
         assert!(state.factions.iter().all(|f| f.approval >= 85.0));
 
-        let mut saw_god_incident = false;
-        for _ in 0..20 {
+        let mut seen_god_ids = std::collections::HashSet::new();
+        for _ in 0..24 {
             if let Some(ev) = state.active_event.clone() {
                 assert!(
                     ev.id.starts_with("god_") || ev.id == "national_election" || ev.id == "post_war_victory",
@@ -1339,7 +1371,7 @@ mod tests {
                     ev.id
                 );
                 if ev.id.starts_with("god_") {
-                    saw_god_incident = true;
+                    seen_god_ids.insert(ev.id.clone());
                 }
                 let first_choice = ev.choices[0].id.clone();
                 crate::events::resolve_event_choice(&mut state, &first_choice);
@@ -1348,14 +1380,58 @@ mod tests {
             assert!(state.game_over.is_none());
             assert_eq!(state.coup_risk, 0.0);
         }
-        assert!(saw_god_incident, "Expected at least one player-favoring god mode incident");
+        assert!(
+            seen_god_ids.len() >= 4,
+            "Expected multiple distinct player-favoring god mode incidents, saw {:?}",
+            seen_god_ids
+        );
+    }
+
+    #[test]
+    fn god_mode_allows_zero_taxes_with_positive_surplus() {
+        let mut state = NationState::from_preset(ScenarioPreset::AureliaDemocracy);
+        // Should do nothing before God Mode is active
+        zero_all_taxes(&mut state);
+        assert!(state.taxes.income_tax > 0.0);
+
+        rebalance_sovereign_ledger(&mut state);
+        zero_all_taxes(&mut state);
+        assert_eq!(state.taxes.income_tax, 0.0);
+        assert_eq!(state.taxes.corporate_tax, 0.0);
+        assert_eq!(state.taxes.tariffs, 0.0);
+        assert_eq!(state.taxes.wealth_tax, 0.0);
+        assert_eq!(state.taxes.interest_rate, 0.0);
+
+        advance_quarter(&mut state);
+        assert!(state.last_fiscal.net_balance >= 999.0);
+        assert!(state.gdp_growth > 6.0);
+        assert_eq!(state.credit_rating, "AAA");
     }
 
     #[test]
     fn existing_save_file_deserializes_with_defaults() {
         if let Ok(json) = std::fs::read_to_string("sovereign_save.json") {
-            let loaded: NationState = serde_json::from_str(&json).expect("legacy save should deserialize");
-            assert_eq!(loaded.annexed_count(), 0);
+            let loaded: NationState = serde_json::from_str(&json).expect("save file should deserialize");
+            assert!(!loaded.nation_name.is_empty());
         }
+        // Also verify a legacy payload missing annexed/puppet fields deserializes cleanly
+        let state = NationState::from_preset(ScenarioPreset::AureliaDemocracy);
+        let mut val = serde_json::to_value(&state).expect("to_value");
+        if let Some(obj) = val.as_object_mut() {
+            obj.remove("annexed_territories");
+            obj.remove("pending_event_target");
+            if let Some(fps) = obj.get_mut("foreign_powers").and_then(|v| v.as_array_mut()) {
+                for fp in fps {
+                    if let Some(fp_obj) = fp.as_object_mut() {
+                        fp_obj.remove("annexed");
+                        fp_obj.remove("puppet_state");
+                    }
+                }
+            }
+        }
+        let legacy_json = serde_json::to_string(&val).expect("to_string");
+        let restored: NationState = serde_json::from_str(&legacy_json).expect("legacy json should deserialize");
+        assert_eq!(restored.annexed_count(), 0);
+        assert_eq!(restored.puppet_count(), 0);
     }
 }
