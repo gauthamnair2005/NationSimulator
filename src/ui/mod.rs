@@ -36,10 +36,16 @@ pub struct NationSimApp {
     header_taps: u8,
     last_tap: Instant,
 
-    // Custom Nation Builder fields
+    // Personal Leader Dossier (Applies to BOTH Presets & Custom Nations!)
+    use_custom_leader_for_presets: bool,
     custom_name: String,
     custom_leader: String,
     custom_title: String,
+    custom_age: u8,
+    custom_education: String,
+    custom_background: LeaderBackground,
+    custom_motto: String,
+    custom_bio: String,
     custom_regime: RegimeType,
     custom_economy: EconomicSystem,
     custom_religion: ReligionPolicy,
@@ -62,12 +68,40 @@ impl NationSimApp {
             last_tick: Instant::now(),
             header_taps: 0,
             last_tap: Instant::now(),
+            use_custom_leader_for_presets: true,
             custom_name: "Republic of Novaria".into(),
             custom_leader: "Soren Lindqvist".into(),
             custom_title: "President".into(),
+            custom_age: 38,
+            custom_education: "Ph.D. in Political Economy & Strategic Studies".into(),
+            custom_background: LeaderBackground::Statesman,
+            custom_motto: "Unity, Vision, and Sovereign Destiny".into(),
+            custom_bio: "A bold reformer and strategist who stepped onto the world stage to forge an enduring superpower.".into(),
             custom_regime: RegimeType::LiberalDemocracy,
             custom_economy: EconomicSystem::MixedEconomy,
             custom_religion: ReligionPolicy::SecularPluralism,
+        }
+    }
+
+    fn build_leader_profile(&self) -> LeaderProfile {
+        LeaderProfile {
+            age: self.custom_age,
+            education: if self.custom_education.trim().is_empty() {
+                "National Academy of Statecraft".into()
+            } else {
+                self.custom_education.trim().to_string()
+            },
+            background: self.custom_background,
+            bio: if self.custom_bio.trim().is_empty() {
+                "A visionary leader ready to guide the nation into history.".into()
+            } else {
+                self.custom_bio.trim().to_string()
+            },
+            motto: if self.custom_motto.trim().is_empty() {
+                "Strength and Sovereignty".into()
+            } else {
+                self.custom_motto.trim().to_string()
+            },
         }
     }
 
@@ -299,9 +333,124 @@ impl NationSimApp {
                     });
                 });
 
+                ui.add_space(12.0);
+                // PERSONAL SOVEREIGN LEADER DOSSIER (Applies to BOTH Presets & Custom Nations!)
+                hero_card_frame(accent_cyan()).show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(
+                            RichText::new("👤 YOUR SOVEREIGN LEADER DOSSIER (NAME, AGE, EDUCATION & BIO)")
+                                .color(accent_cyan())
+                                .size(metrics.fs(14.0))
+                                .strong(),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.checkbox(
+                                &mut self.use_custom_leader_for_presets,
+                                RichText::new("Apply My Leader Identity to Preset Nations Too")
+                                    .color(accent_gold())
+                                    .strong(),
+                            );
+                        });
+                    });
+                    ui.add_space(6.0);
+
+                    if ui.available_width() >= 760.0 {
+                        ui.columns(2, |cols| {
+                            egui::Grid::new("leader_dossier_left")
+                                .num_columns(2)
+                                .spacing([12.0, 7.0])
+                                .show(&mut cols[0], |ui| {
+                                    ui.label("Your Name:");
+                                    ui.text_edit_singleline(&mut self.custom_leader);
+                                    ui.end_row();
+
+                                    ui.label("Executive Title:");
+                                    ui.text_edit_singleline(&mut self.custom_title);
+                                    ui.end_row();
+
+                                    ui.label("Age:");
+                                    ui.add(egui::Slider::new(&mut self.custom_age, 22..=82).text("yrs"));
+                                    ui.end_row();
+
+                                    ui.label("Education:");
+                                    ui.text_edit_singleline(&mut self.custom_education);
+                                    ui.end_row();
+                                });
+
+                            egui::Grid::new("leader_dossier_right")
+                                .num_columns(2)
+                                .spacing([12.0, 7.0])
+                                .show(&mut cols[1], |ui| {
+                                    ui.label("Background Trait:");
+                                    egui::ComboBox::from_id_salt("leader_bg_cb")
+                                        .selected_text(self.custom_background.label())
+                                        .show_ui(ui, |ui| {
+                                            for &bg in LeaderBackground::all() {
+                                                ui.selectable_value(&mut self.custom_background, bg, bg.label());
+                                            }
+                                        });
+                                    ui.end_row();
+
+                                    ui.label("Starting Perk:");
+                                    ui.label(
+                                        RichText::new(self.custom_background.perk_summary())
+                                            .color(accent_green())
+                                            .size(11.5),
+                                    );
+                                    ui.end_row();
+
+                                    ui.label("Personal Motto:");
+                                    ui.text_edit_singleline(&mut self.custom_motto);
+                                    ui.end_row();
+
+                                    ui.label("Leader Biography:");
+                                    ui.add(
+                                        egui::TextEdit::multiline(&mut self.custom_bio)
+                                            .desired_rows(2)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                    ui.end_row();
+                                });
+                        });
+                    } else {
+                        egui::Grid::new("leader_dossier_stacked")
+                            .num_columns(2)
+                            .spacing([12.0, 7.0])
+                            .show(ui, |ui| {
+                                ui.label("Your Name:");
+                                ui.text_edit_singleline(&mut self.custom_leader);
+                                ui.end_row();
+                                ui.label("Executive Title:");
+                                ui.text_edit_singleline(&mut self.custom_title);
+                                ui.end_row();
+                                ui.label("Age:");
+                                ui.add(egui::Slider::new(&mut self.custom_age, 22..=82).text("yrs"));
+                                ui.end_row();
+                                ui.label("Education:");
+                                ui.text_edit_singleline(&mut self.custom_education);
+                                ui.end_row();
+                                ui.label("Background Trait:");
+                                egui::ComboBox::from_id_salt("leader_bg_cb_s")
+                                    .selected_text(self.custom_background.label())
+                                    .show_ui(ui, |ui| {
+                                        for &bg in LeaderBackground::all() {
+                                            ui.selectable_value(&mut self.custom_background, bg, bg.label());
+                                        }
+                                    });
+                                ui.end_row();
+                                ui.label("Personal Motto:");
+                                ui.text_edit_singleline(&mut self.custom_motto);
+                                ui.end_row();
+                                ui.label("Biography:");
+                                ui.add(egui::TextEdit::multiline(&mut self.custom_bio).desired_rows(2));
+                                ui.end_row();
+                            });
+                    }
+                });
+
                 ui.add_space(14.0);
                 ui.label(
-                    RichText::new("⚔ SELECT A CAMPAIGN SCENARIO")
+                    RichText::new("⚔ SELECT A PRESET CAMPAIGN SCENARIO")
                         .color(accent_cyan())
                         .size(metrics.fs(14.5))
                         .strong(),
@@ -369,6 +518,10 @@ impl NationSimApp {
 
                 if let Some(p) = chosen_preset {
                     self.state = NationState::from_preset(p);
+                    if self.use_custom_leader_for_presets {
+                        let profile = self.build_leader_profile();
+                        self.state.apply_leader_profile(&self.custom_leader, &self.custom_title, profile);
+                    }
                     self.active_tab = DashboardTab::Overview;
                     self.auto_play = false;
                     let kind = CinematicKind::for_preset(&self.state);
@@ -574,6 +727,8 @@ impl NationSimApp {
                             self.custom_economy,
                             self.custom_religion,
                         );
+                        let profile = self.build_leader_profile();
+                        self.state.apply_leader_profile(&self.custom_leader, &self.custom_title, profile);
                         self.active_tab = DashboardTab::Overview;
                         self.auto_play = false;
                         self.cinematic = Some(CinematicState::new(CinematicKind::FoundingNewHomeland));
@@ -669,6 +824,12 @@ impl NationSimApp {
                     );
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("🎬 Intro").on_hover_text("Replay Intro Cinematic").clicked() {
+                            self.auto_play = false;
+                            let kind = CinematicKind::for_preset(&self.state);
+                            self.cinematic = Some(CinematicState::new(kind));
+                            self.screen = AppScreen::Cinematic;
+                        }
                         if ui.button("Menu").clicked() {
                             self.auto_play = false;
                             self.screen = AppScreen::Setup;

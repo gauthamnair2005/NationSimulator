@@ -221,15 +221,42 @@ pub fn render_overview_tab(
                     );
                     ui.add_space(6.0);
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("NATIONAL PROFILE & CAPACITY").color(accent_cyan()).size(metrics.fs(12.0)).strong());
-                        ui.label(RichText::new(format!("{} {}", state.leader_title, state.leader_name)).color(text_primary()).size(metrics.fs(14.0)).strong());
+                        ui.label(RichText::new("NATIONAL PROFILE & LEADER DOSSIER").color(accent_cyan()).size(metrics.fs(12.0)).strong());
+                        ui.label(
+                            RichText::new(format!(
+                                "{} {}  (Age {} • {})",
+                                state.leader_title,
+                                state.leader_name,
+                                state.leader_profile.age,
+                                state.leader_profile.background.label()
+                            ))
+                            .color(text_primary())
+                            .size(metrics.fs(13.8))
+                            .strong(),
+                        );
+                        ui.label(
+                            RichText::new(format!(
+                                "🎓 {}  •  “{}”",
+                                state.leader_profile.education, state.leader_profile.motto
+                            ))
+                            .color(accent_gold())
+                            .size(metrics.fs(11.3))
+                            .italics(),
+                        );
+                        if !state.leader_profile.bio.trim().is_empty() {
+                            ui.label(
+                                RichText::new(&state.leader_profile.bio)
+                                    .color(text_muted())
+                                    .size(metrics.fs(11.0)),
+                            );
+                        }
                         ui.label(
                             RichText::new(format!(
                                 "Pop: {:.2}M  •  Credit: {}  •  Debt/GDP: {:.1}%  •  Gini: {:.1}",
                                 state.population_m, state.credit_rating, state.debt_to_gdp(), state.gini
                             ))
                             .color(text_muted())
-                            .size(metrics.fs(11.5)),
+                            .size(metrics.fs(11.2)),
                         );
                     });
                 });

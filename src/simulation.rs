@@ -147,6 +147,7 @@ pub fn advance_quarter(state: &mut NationState) {
     if state.quarter > 4 {
         state.quarter = 1;
         state.year += 1;
+        state.leader_profile.age = state.leader_profile.age.saturating_add(1);
     }
 
     // Decrement cooldowns
@@ -2487,5 +2488,30 @@ mod tests {
         assert!(run_strategic_activity(&mut state, "pandemic_vaccine_sprint").is_ok());
         assert!(!state.pandemic.active);
         assert_eq!(state.pandemic.lockdown_level, LockdownLevel::None);
+    }
+
+    #[test]
+    fn custom_leader_profile_applies_to_presets_and_ages_each_year() {
+        let mut state = NationState::from_preset(ScenarioPreset::AureliaDemocracy);
+        let base_tech = state.tech_level;
+        let profile = LeaderProfile {
+            age: 35,
+            education: "Ph.D. Aerospace Engineering".into(),
+            background: LeaderBackground::Scientist,
+            bio: "Built the nation's first orbital launch system.".into(),
+            motto: "To the Stars".into(),
+        };
+        state.apply_leader_profile("Gautham Nair", "Prime Minister", profile);
+        assert_eq!(state.leader_name, "Gautham Nair");
+        assert_eq!(state.leader_title, "Prime Minister");
+        assert_eq!(state.leader_profile.age, 35);
+        assert!(state.tech_level > base_tech);
+
+        // Advance 4 quarters -> leader turns 36
+        for _ in 0..4 {
+            state.active_event = None;
+            advance_quarter(&mut state);
+        }
+        assert_eq!(state.leader_profile.age, 36);
     }
 }

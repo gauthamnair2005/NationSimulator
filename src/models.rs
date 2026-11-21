@@ -426,6 +426,73 @@ impl LockdownLevel {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LeaderBackground {
+    #[default]
+    Statesman,
+    Economist,
+    General,
+    Revolutionary,
+    Scientist,
+    Diplomat,
+}
+
+impl LeaderBackground {
+    pub fn all() -> &'static [LeaderBackground] {
+        &[
+            Self::Statesman,
+            Self::Economist,
+            Self::General,
+            Self::Revolutionary,
+            Self::Scientist,
+            Self::Diplomat,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Statesman => "Constitutional Statesman",
+            Self::Economist => "Master Economist",
+            Self::General => "Decorated General",
+            Self::Revolutionary => "People's Revolutionary",
+            Self::Scientist => "Visionary Scientist",
+            Self::Diplomat => "Grand Diplomat",
+        }
+    }
+
+    pub fn perk_summary(&self) -> &'static str {
+        match self {
+            Self::Statesman => "+8 Legitimacy, +10 Political Capital, +6 Stability",
+            Self::Economist => "+1.2% GDP Growth, +$14B Treasury, +10 Capitalists",
+            Self::General => "+12 Military Readiness, +12 Military Loyalty, +25K Troops",
+            Self::Revolutionary => "+15 Labor Unions, +10 Approval, +8 Stability",
+            Self::Scientist => "+12 Tech Level, +10 Education, +12 Intelligentsia",
+            Self::Diplomat => "+12 Relations with all World Powers, +8 Legitimacy",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaderProfile {
+    pub age: u8,
+    pub education: String,
+    pub background: LeaderBackground,
+    pub bio: String,
+    pub motto: String,
+}
+
+impl Default for LeaderProfile {
+    fn default() -> Self {
+        Self {
+            age: 42,
+            education: "Ph.D. in Political Economy & Statecraft".into(),
+            background: LeaderBackground::Statesman,
+            bio: "A determined visionary who rose from humble origins to reshape the destiny of the nation.".into(),
+            motto: "Strength, Wisdom, and Sovereign Destiny".into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PandemicState {
     pub active: bool,
@@ -748,6 +815,8 @@ pub struct NationState {
     pub armed_forces: ArmedForces,
     #[serde(default)]
     pub pandemic: PandemicState,
+    #[serde(default)]
+    pub leader_profile: LeaderProfile,
 }
 
 impl NationState {
@@ -881,6 +950,68 @@ impl NationState {
         if self.flags.ledger_rebalance && self.god_surplus_bn <= 0.0 {
             self.god_surplus_bn = 1000.0;
         }
+    }
+
+    pub fn apply_leader_profile(
+        &mut self,
+        custom_name: &str,
+        custom_title: &str,
+        profile: LeaderProfile,
+    ) {
+        if !custom_name.trim().is_empty() {
+            self.leader_name = custom_name.trim().to_string();
+        }
+        if !custom_title.trim().is_empty() {
+            self.leader_title = custom_title.trim().to_string();
+        }
+        match profile.background {
+            LeaderBackground::Statesman => {
+                self.legitimacy = (self.legitimacy + 8.0).min(100.0);
+                self.stability = (self.stability + 6.0).min(100.0);
+                self.political_capital = (self.political_capital + 10.0).min(100.0);
+            }
+            LeaderBackground::Economist => {
+                self.gdp_growth += 1.2;
+                self.treasury_bn += 14.0;
+                self.adjust_faction(FactionId::Capitalists, 10.0, 4.0);
+            }
+            LeaderBackground::General => {
+                self.military_readiness = (self.military_readiness + 12.0).min(100.0);
+                self.active_troops_k += 25.0;
+                self.adjust_faction(FactionId::Military, 12.0, 5.0);
+            }
+            LeaderBackground::Revolutionary => {
+                self.approval = (self.approval + 10.0).min(100.0);
+                self.stability = (self.stability + 8.0).min(100.0);
+                self.adjust_faction(FactionId::LaborUnions, 15.0, 6.0);
+            }
+            LeaderBackground::Scientist => {
+                self.tech_level = (self.tech_level + 12.0).min(100.0);
+                self.education_level = (self.education_level + 10.0).min(100.0);
+                self.adjust_faction(FactionId::Intelligentsia, 12.0, 5.0);
+            }
+            LeaderBackground::Diplomat => {
+                self.legitimacy = (self.legitimacy + 8.0).min(100.0);
+                for fp in &mut self.foreign_powers {
+                    if !fp.annexed && !fp.at_war {
+                        fp.relation = (fp.relation + 12.0).min(100.0);
+                    }
+                }
+            }
+        }
+        let edu = profile.education.clone();
+        let bg = profile.background.label();
+        let age = profile.age;
+        let motto = profile.motto.clone();
+        self.leader_profile = profile;
+        self.log(
+            LogCategory::Political,
+            format!("Leader Dossier: {} {} (Age {})", self.leader_title, self.leader_name, age),
+            format!(
+                "Background: {} | Education: {} | Motto: \"{}\"",
+                bg, edu, motto
+            ),
+        );
     }
 
     pub fn faction(&self, id: FactionId) -> &Faction {
@@ -1595,6 +1726,7 @@ impl NationState {
             god_surplus_bn: 0.0,
             armed_forces: ArmedForces::default(),
             pandemic: PandemicState::default(),
+            leader_profile: LeaderProfile::default(),
         }
     }
 
